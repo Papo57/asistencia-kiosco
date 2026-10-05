@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <!-- Solo se permite hablar con Google Apps Script y cargar la librería de rostro: bloquea código inyectado. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src https://script.google.com https://script.googleusercontent.com https://cdn.jsdelivr.net; media-src 'self' blob: mediastream:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0566B2">
+  <title>Asistencia</title>
+  <style>
+  :root {
+    --azul: #0566B2; --azul-claro: #106EBE; --fondo: #F7FBFF; --tarjeta: #FCFEFF;
+    --texto: #323130; --gris: #6E6E6E; --borde: #E1DFDD;
+    --ok: #107C10; --error: #A80000; --alerta: #C77700;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: var(--fondo); color: var(--texto); }
+  .contenedor { max-width: 760px; margin: 0 auto; padding: 12px 16px 80px; }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 0; }
+  header .icono { font-size: 34px; }
+  header small { display: block; font-size: 13px; color: var(--gris); }
+  header strong { font-size: 20px; }
+  h2 { font-size: 17px; margin: 18px 0 8px; }
+
+  button, .boton {
+    border: 0; border-radius: 30px; padding: 12px 18px; font-size: 15px; font-weight: 700;
+    background: var(--azul); color: #fff; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  button.secundario { background: #fff; color: var(--azul); border: 2px solid var(--azul); }
+  button.peligro { background: var(--error); }
+  button.chico { padding: 6px 12px; font-size: 13px; }
+  button.bloque { width: 100%; }
+
+  .pestanas { display: flex; gap: 8px; margin: 8px 0 12px; }
+  .pestanas button { flex: 1; background: #fff; color: var(--azul); border: 2px solid var(--azul); }
+  .pestanas button.activa { background: var(--azul); color: #fff; }
+
+  .tarjeta {
+    background: var(--tarjeta); border-radius: 15px; padding: 12px; margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .tarjeta .titulo { font-weight: 700; font-size: 16px; }
+  .tarjeta .sub { color: var(--gris); font-size: 13px; margin-top: 2px; }
+  .tarjeta .acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .etiqueta { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; margin: 4px 4px 0 0; }
+  .etiqueta.ok { background: #DFF6DD; color: var(--ok); }
+  .etiqueta.mal { background: #FDE7E9; color: var(--error); }
+  .etiqueta.neutra { background: #EDEBE9; color: var(--texto); }
+
+  label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+  input, select {
+    width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--borde); border-radius: 8px; background: #fff;
+  }
+  .fila2 { display: flex; gap: 10px; }
+  .fila2 > div { flex: 1; }
+  .check { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-weight: 400; }
+  .check input { width: auto; }
+
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
+  .modal.abierto { display: flex; }
+  .modal .caja {
+    background: #fff; width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto;
+    border-radius: 18px 18px 0 0; padding: 18px 16px 24px;
+  }
+  @media (min-width: 600px) { .modal { align-items: center; } .modal .caja { border-radius: 18px; } }
+  .modal h3 { margin: 0 0 6px; }
+  .modal .botones { display: flex; gap: 8px; margin-top: 16px; }
+  .modal .botones button { flex: 1; }
+
+  .camara { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 12px; overflow: hidden; margin-top: 10px; }
+  .camara video, .camara img { width: 100%; height: 100%; object-fit: cover; }
+  .camara video { transform: scaleX(-1); }
+  .instruccion { text-align: center; font-weight: 700; font-size: 17px; min-height: 26px; margin: 10px 0; color: var(--azul); }
+
+  .codigo-grande { font-size: 44px; letter-spacing: 10px; text-align: center; font-weight: 800; color: var(--azul); margin: 16px 0; }
+  .nota { font-size: 13px; color: var(--gris); }
+  .vacio { text-align: center; color: var(--gris); padding: 24px; }
+
+  .aviso {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%) translateY(120px);
+    max-width: 92%; padding: 12px 18px; border-radius: 12px; color: #fff; font-weight: 600;
+    transition: transform .25s; z-index: 20; background: var(--azul);
+  }
+  .aviso.visible { transform: translateX(-50%) translateY(0); }
+  .aviso.ok { background: var(--ok); }
+  .aviso.error { background: var(--error); }
+  .aviso.alerta { background: var(--alerta); }
+</style>
+
+  <style>
+    body { user-select: none; -webkit-user-select: none; }
+    .pantalla { display: none; max-width: 520px; margin: 0 auto; padding: 16px; text-align: center; }
+    .pantalla.visible { display: block; }
+    .barra { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; }
+    .barra .tienda { font-weight: 800; color: var(--azul); font-size: 18px; text-align: left; }
+    .barra .gps { font-size: 12px; color: var(--gris); }
+    .reloj { font-size: 64px; font-weight: 800; margin: 10px 0 0; font-variant-numeric: tabular-nums; }
+    .fecha { color: var(--gris); margin-bottom: 18px; }
+    .puntos { display: flex; justify-content: center; gap: 16px; margin: 14px 0 20px; }
+    .puntos span { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--azul); }
+    .puntos span.lleno { background: var(--azul); }
+    .teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 360px; margin: 0 auto; }
+    .teclado button { font-size: 30px; padding: 18px 0; border-radius: 18px; background: #fff; color: var(--texto); box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+    .teclado button:active { background: #e6f0fa; }
+    .teclado .ok { background: var(--azul); color: #fff; }
+    .saludo { font-size: 28px; font-weight: 800; margin: 24px 0 6px; }
+    .grande { display: block; width: 100%; font-size: 24px; padding: 22px; margin-top: 14px; border-radius: 22px; }
+    .icono-resultado { font-size: 90px; margin-top: 30px; }
+    .titulo-resultado { font-size: 28px; font-weight: 800; margin: 8px 0; }
+    .foto-resultado { width: 160px; height: 120px; object-fit: cover; border-radius: 12px; margin-top: 12px; }
+    .camara { max-width: 480px; margin: 10px auto 0; }
+    .enlace { background: none; color: var(--gris); font-weight: 400; font-size: 14px; margin-top: 26px; text-decoration: underline; }
+    .campo-codigo { text-align: center; font-size: 26px; letter-spacing: 8px; margin-top: 12px; }
+    .check { text-align: left; }
+  </style>
+</head>
+<body>
+  <!-- Cargando -->
+  <div class="pantalla visible" id="sCargando"><div class="icono-resultado">🕒</div><p id="cargandoTexto">Cargando…</p></div>
+
+  <!-- Activación del equipo -->
+  <div class="pantalla" id="sActivar">
+    <div class="icono-resultado">🔒</div>
+    <div class="titulo-resultado">Activa este equipo</div>
+    <p class="nota">Pide al administrador el código de activación de esta tienda. Debes estar dentro de la tienda.</p>
+    <input id="actCodigo" class="campo-codigo" inputmode="numeric" maxlength="6" placeholder="······" autocomplete="off">
+    <button class="grande" id="btnActivar" onclick="activar()">Activar</button>
+    <p class="nota" id="actEstado"></p>
+  </div>
+
+  <!-- Inicio: código personal -->
+  <div class="pantalla" id="sInicio">
+    <div class="barra"><div class="tienda" id="nomTienda"></div><div class="gps" id="gpsEstado">📍 …</div></div>
+    <div class="reloj" id="reloj">--:--</div>
+    <div class="fecha" id="fecha"></div>
+    <div>Escribe tu código</div>
+    <div class="puntos" id="puntos"></div>
+    <div class="teclado">
+      <button onclick="tecla('1')">1</button><button onclick="tecla('2')">2</button><button onclick="tecla('3')">3</button>
+      <button onclick="tecla('4')">4</button><button onclick="tecla('5')">5</button><button onclick="tecla('6')">6</button>
+      <button onclick="tecla('7')">7</button><button onclick="tecla('8')">8</button><button onclick="tecla('9')">9</button>
+      <button onclick="borrar()">⌫</button><button onclick="tecla('0')">0</button><button class="ok" id="btnOk" onclick="identificar()">OK</button>
+    </div>
+    <button class="enlace" onclick="abrirRegistro()">Registrar rostro (con código del administrador)</button>
+  </div>
+
+  <!-- Elegir acción -->
+  <div class="pantalla" id="sAcciones">
+    <div class="saludo" id="saludo"></div>
+    <div class="nota">¿Qué deseas registrar?</div>
+    <div id="botonesAccion"></div>
+    <button class="grande secundario" onclick="reiniciar()">Cancelar</button>
+  </div>
+
+  <!-- Registro de rostro: código -->
+  <div class="pantalla" id="sRegCodigo">
+    <div class="icono-resultado">🙂</div>
+    <div class="titulo-resultado">Registrar rostro</div>
+    <p class="nota">Escribe el código de registro que generó el administrador para esta persona.</p>
+    <input id="regCodigo" class="campo-codigo" inputmode="numeric" maxlength="6" placeholder="······" autocomplete="off">
+    <button class="grande" id="btnRegCodigo" onclick="validarRegistro()">Continuar</button>
+    <button class="grande secundario" onclick="reiniciar()">Cancelar</button>
+  </div>
+
+  <!-- Registro de rostro: consentimiento -->
+  <div class="pantalla" id="sRegConsentimiento">
+    <div class="saludo" id="regNombre"></div>
+    <p class="nota">Con buena luz de frente. Sin gorra, lentes oscuros ni mascarilla.</p>
+    <label class="check"><input type="checkbox" id="regAcepto">
+      Autorizo que se guarde mi foto y un patrón numérico de mi rostro únicamente para verificar mi identidad al registrar asistencia.</label>
+    <button class="grande" onclick="iniciarRegistro()">Comenzar</button>
+    <button class="grande secundario" onclick="reiniciar()">Cancelar</button>
+  </div>
+
+  <!-- Cámara -->
+  <div class="pantalla" id="sCamara">
+    <div class="saludo" id="camTitulo"></div>
+    <div class="camara"><video id="video"></video></div>
+    <div class="instruccion" id="instruccion"></div>
+    <button class="secundario" onclick="reiniciar()">Cancelar</button>
+  </div>
+
+  <!-- Resultado -->
+  <div class="pantalla" id="sResultado">
+    <div class="icono-resultado" id="resIcono"></div>
+    <div class="titulo-resultado" id="resTitulo"></div>
+    <div id="resDetalle" style="font-size:20px"></div>
+    <img class="foto-resultado" id="resFoto" alt="" style="display:none">
+    <p class="nota">Volviendo al inicio…</p>
+  </div>
+
+  <div class="aviso" id="aviso"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+  <script>
+    // ============================================================
+    // Dirección de la "API kiosco" de Apps Script (implementación con acceso "Cualquier usuario").
+    // No es secreta: la seguridad está en el servidor (equipo activado + código + rostro + GPS).
+    var API_URL = '__API_URL__';
+    // ============================================================
+  </script>
+  <script>
+    /**
+ * Módulo de rostro (navegador) del kiosco. Usa @vladmandic/face-api (cargado desde jsDelivr).
+ *   await Rostro.iniciar(videoEl)
+ *   const vivo = await Rostro.pruebaVida(avisar)          // parpadeo + giro, orden aleatorio
+ *   const { descriptores, foto } = await Rostro.capturar(5, avisar)
+ *   Rostro.detener()
+ * Solo calcula descriptores; la comparación de identidad se hace en el servidor.
+ */
+var Rostro = (function () {
+  var MODELOS = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model/';
+  var video = null, stream = null, modelosListos = false;
+
+  function esperar(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function opcRapida() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }); }
+  function opcPrecisa() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 }); }
+
+  async function cargarModelos() {
+    if (modelosListos) return;
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODELOS),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODELOS),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODELOS)
+    ]);
+    modelosListos = true;
+  }
+
+  async function iniciar(videoEl) {
+    video = videoEl;
+    video.setAttribute('playsinline', '');
+    video.muted = true;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false
+      });
+    } catch (e) {
+      throw new Error(mensajeCamara(e));
+    }
+    video.srcObject = stream;
+    await new Promise(function (r) { if (video.readyState >= 1) r(); else video.onloadedmetadata = r; });
+    await video.play();
+    await cargarModelos();
+  }
+
+  function mensajeCamara(e) {
+    if (e.name === 'NotAllowedError') {
+      return /system/i.test(e.message)
+        ? 'El sistema operativo bloquea la cámara. En Windows: Configuración → Privacidad → Cámara → permitir a las apps de escritorio.'
+        : 'La cámara está bloqueada para esta página. Toca el ícono 🔒 o 📷 junto a la dirección, elige "Permitir" en Cámara y recarga.';
+    }
+    if (e.name === 'NotFoundError' || e.name === 'OverconstrainedError') return 'No se encontró una cámara en este equipo.';
+    if (e.name === 'NotReadableError') return 'Otra aplicación está usando la cámara (Zoom, Teams…). Ciérrala e intenta de nuevo.';
+    return 'No se pudo abrir la cámara: ' + e.message;
+  }
+
+  function detener() {
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null;
+    if (video) video.srcObject = null;
+  }
+
+  // ------------------------------------------------ Medidas de la cara (68 puntos)
+  function d(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  // Apertura del ojo (Eye Aspect Ratio): baja mucho al cerrar el ojo.
+  function ear(o) { return (d(o[1], o[5]) + d(o[2], o[4])) / (2 * d(o[0], o[3])); }
+  function medidas(lm) {
+    var p = lm.positions;
+    return {
+      ear: (ear(p.slice(36, 42)) + ear(p.slice(42, 48))) / 2,
+      // Posición de la punta de la nariz entre los extremos de la mandíbula: ~0.5 de frente.
+      // Una foto plana inclinada mantiene esta proporción; una cabeza real que gira, no.
+      giro: (p[30].x - p[0].x) / (p[16].x - p[0].x)
+    };
+  }
+
+  async function leer() {
+    var r = await faceapi.detectAllFaces(video, opcRapida()).withFaceLandmarks();
+    if (r.length === 0) return { estado: 'Coloca tu cara frente a la cámara' };
+    if (r.length > 1) return { estado: 'Solo debe aparecer una persona' };
+    if (r[0].detection.box.width / video.videoWidth < 0.2) return { estado: 'Acércate un poco más' };
+    return { estado: 'ok', m: medidas(r[0].landmarks) };
+  }
+
+  function promedio(a) { return a.reduce(function (s, x) { return s + x; }, 0) / a.length; }
+
+  async function retoParpadeo(avisar) {
+    var texto = 'Parpadea despacio 👁️';
+    var base = [], cerrado = false, inicio = Date.now();
+    avisar(texto);
+    while (Date.now() - inicio < 15000) {
+      var l = await leer();
+      if (l.estado !== 'ok') { avisar(l.estado); continue; }
+      avisar(texto);
+      var e = l.m.ear;
+      if (!cerrado) {
+        if (base.length >= 3 && e < promedio(base) * 0.7) cerrado = true;
+        else { base.push(e); if (base.length > 8) base.shift(); }
+      } else if (e > promedio(base) * 0.85) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async function retoGiro(avisar) {
+    var texto = 'Gira la cabeza hacia un lado y regresa al frente ↔️';
+    var girado = false, inicio = Date.now();
+    avisar(texto);
+    while (Date.now() - inicio < 15000) {
+      var l = await leer();
+      if (l.estado !== 'ok') { avisar(l.estado); continue; }
+      avisar(girado ? 'Ahora regresa al frente' : texto);
+      var g = l.m.giro;
+      if (!girado && (g < 0.3 || g > 0.7)) girado = true;
+      else if (girado && g > 0.4 && g < 0.6) return true;
+    }
+    return false;
+  }
+
+  async function pruebaVida(avisar) {
+    var retos = Math.random() < 0.5 ? [retoParpadeo, retoGiro] : [retoGiro, retoParpadeo];
+    for (var i = 0; i < retos.length; i++) {
+      if (!(await retos[i](avisar))) return false;
+    }
+    return true;
+  }
+
+  // ------------------------------------------------ Captura
+  function tomarFoto() {
+    var w = 480, h = Math.round(video.videoHeight * w / video.videoWidth);
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.translate(w, 0); ctx.scale(-1, 1); // igual a como la persona se ve en pantalla
+    ctx.drawImage(video, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', 0.7);
+  }
+
+  async function capturar(n, avisar) {
+    avisar('No te muevas, tomando foto… 📸');
+    var descriptores = [], foto = null, inicio = Date.now();
+    while (descriptores.length < n && Date.now() - inicio < 15000) {
+      var r = await faceapi.detectAllFaces(video, opcPrecisa()).withFaceLandmarks().withFaceDescriptors();
+      if (r.length !== 1) { avisar(r.length ? 'Solo debe aparecer una persona' : 'No te muevas, mira a la cámara'); continue; }
+      if (!foto) foto = tomarFoto();
+      descriptores.push(Array.from(r[0].descriptor, function (x) { return Math.round(x * 1e5) / 1e5; }));
+      await esperar(120);
+    }
+    if (descriptores.length < n) throw new Error('No se pudo capturar el rostro. Mejora la luz e intenta de nuevo.');
+    return { descriptores: descriptores, foto: foto };
+  }
+
+  return { precargar: cargarModelos, iniciar: iniciar, detener: detener, pruebaVida: pruebaVida, capturar: capturar };
+})();
+
+  </script>
+  <script>
+    // ---------------------------------------------- Comunicación con el servidor
+    async function llamar(accion, datos) {
+      var ctrl = new AbortController();
+      var limite = setTimeout(function () { ctrl.abort(); }, 45000);
+      var r;
+      try {
+        var resp = await fetch(API_URL, {
+          method: 'POST', redirect: 'follow', signal: ctrl.signal,
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ accion: accion, datos: datos || {} })
+        });
+        r = await resp.json();
+      } catch (e) {
+        throw { resultado: 'ERROR_RED', mensaje: 'Sin conexión con el servidor. Revisa el internet e intenta de nuevo.' };
+      } finally {
+        clearTimeout(limite);
+      }
+      if (!r || !r.ok) throw r || { resultado: 'ERROR', mensaje: 'Respuesta inválida del servidor' };
+      return r;
+    }
+
+    function $(id) { return document.getElementById(id); }
+    function esc(t) {
+      return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    var _avisoTimer;
+    function aviso(mensaje, tipo) {
+      var el = $('aviso');
+      el.textContent = mensaje;
+      el.className = 'aviso ' + (tipo || 'info') + ' visible';
+      clearTimeout(_avisoTimer);
+      _avisoTimer = setTimeout(function () { el.className = 'aviso'; }, tipo === 'error' ? 6000 : 3500);
+    }
+
+    // ---------------------------------------------- Estado
+    var CLAVE_TOKEN = 'asistencia_kiosco_token';
+    var LARGO_CODIGO = 4;
+    var estado = {
+      token: null, tienda: null, desfaseMs: 0, codigo: '', ticket: null, persona: null, acciones: [],
+      registro: null, gps: null, timer: null, ocupado: false, intento: 0
+    };
+
+    function leerToken() { try { return localStorage.getItem(CLAVE_TOKEN); } catch (e) { return null; } }
+    function guardarToken(t) { try { localStorage.setItem(CLAVE_TOKEN, t); } catch (e) { /* sin almacenamiento */ } }
+    function borrarToken() { try { localStorage.removeItem(CLAVE_TOKEN); } catch (e) { /* nada */ } }
+
+    function mostrar(id) {
+      document.querySelectorAll('.pantalla').forEach(function (p) { p.classList.remove('visible'); });
+      $(id).classList.add('visible');
+    }
+
+    function programarRegreso(ms) {
+      clearTimeout(estado.timer);
+      estado.timer = setTimeout(reiniciar, ms);
+    }
+
+    function reiniciar() {
+      clearTimeout(estado.timer);
+      Rostro.detener();
+      estado.intento++; // invalida cualquier captura en curso
+      estado.codigo = ''; estado.ticket = null; estado.persona = null; estado.registro = null; estado.ocupado = false;
+      pintarPuntos();
+      mostrar(estado.token ? 'sInicio' : 'sActivar');
+    }
+
+    // ---------------------------------------------- Reloj (hora del servidor)
+    function tic() {
+      var ahora = new Date(Date.now() + estado.desfaseMs);
+      $('reloj').textContent = ahora.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Guatemala' });
+      var f = ahora.toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Guatemala' });
+      $('fecha').textContent = f.charAt(0).toUpperCase() + f.slice(1);
+    }
+
+    // ---------------------------------------------- GPS continuo
+    function iniciarGps() {
+      if (!navigator.geolocation) { $('gpsEstado').textContent = '📍 Sin GPS'; return; }
+      navigator.geolocation.watchPosition(function (p) {
+        var c = p.coords;
+        // Se conserva la lectura más precisa de los últimos 60 s.
+        if (!estado.gps || Date.now() - estado.gps.t > 60000 || c.accuracy <= estado.gps.precision) {
+          estado.gps = { lat: c.latitude, lng: c.longitude, precision: c.accuracy, t: Date.now() };
+        }
+        $('gpsEstado').textContent = '📍 ±' + Math.round(c.accuracy) + ' m';
+      }, function () {
+        $('gpsEstado').textContent = '📍 Sin ubicación';
+      }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
+    }
+
+    async function obtenerGps() {
+      var inicio = Date.now();
+      while (Date.now() - inicio < 15000) {
+        if (estado.gps && Date.now() - estado.gps.t < 120000) return estado.gps;
+        await new Promise(function (r) { setTimeout(r, 500); });
+      }
+      throw { mensaje: 'No se pudo obtener la ubicación del equipo. Permite la ubicación para esta página.' };
+    }
+
+    // ---------------------------------------------- Arranque
+    async function arrancar() {
+      if (API_URL.indexOf('https://script.google.com/') !== 0) {
+        $('cargandoTexto').textContent = 'Falta configurar la dirección de la API (API_URL).';
+        return;
+      }
+      estado.token = leerToken();
+      try {
+        var r = await llamar('estado', { token: estado.token || '' });
+        estado.desfaseMs = r.datos.ahora - Date.now();
+        if (r.datos.activado) ponerTienda(r.datos.tienda);
+        else { borrarToken(); estado.token = null; }
+        setInterval(tic, 1000); tic();
+        iniciarGps();
+        Rostro.precargar().catch(function () { /* se reintenta al usar la cámara */ });
+        reiniciar();
+      } catch (e) {
+        $('sCargando').innerHTML = '<div class="icono-resultado">⚠️</div><p>' + esc(e.mensaje || 'Error') + '</p>' +
+          '<button onclick="location.reload()">Reintentar</button>';
+      }
+    }
+
+    function ponerTienda(t) {
+      estado.tienda = t;
+      $('nomTienda').textContent = t.nombre;
+    }
+
+    // ---------------------------------------------- Activación
+    async function activar() {
+      var codigo = $('actCodigo').value.trim();
+      if (!/^\d{6}$/.test(codigo)) return aviso('El código debe tener 6 dígitos', 'error');
+      $('btnActivar').disabled = true;
+      $('actEstado').textContent = 'Verificando ubicación…';
+      try {
+        var g = await obtenerGps();
+        $('actEstado').textContent = 'Activando…';
+        var r = await llamar('activar', { codigo: codigo, lat: g.lat, lng: g.lng });
+        guardarToken(r.datos.token);
+        estado.token = r.datos.token;
+        ponerTienda(r.datos.tienda);
+        $('actCodigo').value = '';
+        aviso('Equipo activado para ' + r.datos.tienda.nombre, 'ok');
+        reiniciar();
+      } catch (e) {
+        aviso(e.mensaje || 'Error', 'error');
+      }
+      $('actEstado').textContent = '';
+      $('btnActivar').disabled = false;
+    }
+
+    // ---------------------------------------------- Código personal
+    function pintarPuntos() {
+      var h = '';
+      for (var i = 0; i < LARGO_CODIGO; i++) h += '<span class="' + (i < estado.codigo.length ? 'lleno' : '') + '"></span>';
+      $('puntos').innerHTML = h;
+    }
+    function tecla(d) {
+      if (estado.codigo.length < LARGO_CODIGO) { estado.codigo += d; pintarPuntos(); }
+      if (estado.codigo.length === LARGO_CODIGO) identificar();
+    }
+    function borrar() { estado.codigo = estado.codigo.slice(0, -1); pintarPuntos(); }
+
+    async function identificar() {
+      if (estado.ocupado || estado.codigo.length !== LARGO_CODIGO) return;
+      estado.ocupado = true;
+      $('btnOk').disabled = true;
+      var codigo = estado.codigo;
+      estado.codigo = ''; pintarPuntos();
+      try {
+        var r = await llamar('identificar', { token: estado.token, codigo: codigo });
+        estado.ticket = r.datos.ticket;
+        estado.persona = r.datos;
+        var acciones = r.datos.acciones;
+        if (!acciones.length) {
+          resultado(false, 'Ya registraste tu salida de hoy', '¡Hasta mañana, ' + r.datos.nombre + '!');
+        } else if (acciones.length === 1) {
+          marcar(acciones[0]); // el sistema decide: un solo paso posible
+        } else {
+          estado.acciones = acciones;
+          $('saludo').textContent = 'Hola, ' + r.datos.nombre + ' 👋';
+          $('botonesAccion').innerHTML = acciones.map(function (a, i) {
+            return '<button class="grande" onclick="marcar(estado.acciones[' + i + '])">' + esc(a.texto) + '</button>';
+          }).join('');
+          mostrar('sAcciones');
+          programarRegreso(30000);
+        }
+      } catch (e) {
+        manejarError(e);
+      }
+      $('btnOk').disabled = false;
+      estado.ocupado = false;
+    }
+
+    // ---------------------------------------------- Cámara (común a marcaje y registro)
+    function instr(t) { $('instruccion').textContent = t; }
+
+    /** Enciende la cámara, hace la prueba de vida y captura n descriptores. Cancela si se reinicia. */
+    async function capturarRostro(titulo, n) {
+      clearTimeout(estado.timer);
+      var miIntento = estado.intento;
+      function vigente() { if (miIntento !== estado.intento) throw { cancelado: true }; }
+      $('camTitulo').textContent = titulo;
+      mostrar('sCamara');
+      instr('Encendiendo cámara…');
+      programarRegreso(90000); // nadie se queda atorado en la cámara
+      try {
+        await Rostro.iniciar($('video'));
+        vigente();
+        var vivo = await Rostro.pruebaVida(instr);
+        vigente();
+        if (!vivo) throw { mensaje: 'No se completó la prueba de vida. Intenta de nuevo.' };
+        var cap = await Rostro.capturar(n, instr);
+        vigente();
+        instr('Enviando…');
+        return { cap: cap, vigente: vigente };
+      } finally {
+        Rostro.detener();
+      }
+    }
+
+    // ---------------------------------------------- Marcaje
+    async function marcar(accion) {
+      try {
+        var c = await capturarRostro(accion.texto + ' · ' + estado.persona.nombre, 3);
+        var g = await obtenerGps();
+        var r = await llamar('marcar', {
+          token: estado.token, ticket: estado.ticket, tipo: accion.tipo, descriptores: c.cap.descriptores,
+          foto: c.cap.foto, vida: true, lat: g.lat, lng: g.lng, precision: g.precision
+        });
+        c.vigente();
+        resultado(true, r.datos.texto + ' registrada', r.datos.nombre + ' · ' + r.datos.hora, c.cap.foto);
+      } catch (e) {
+        if (!e.cancelado) manejarError(e);
+      }
+    }
+
+    // ---------------------------------------------- Registro de rostro
+    function abrirRegistro() {
+      $('regCodigo').value = '';
+      mostrar('sRegCodigo');
+      programarRegreso(120000);
+    }
+
+    async function validarRegistro() {
+      var codigo = $('regCodigo').value.trim();
+      if (!/^\d{6}$/.test(codigo)) return aviso('El código debe tener 6 dígitos', 'error');
+      $('btnRegCodigo').disabled = true;
+      try {
+        var r = await llamar('validarRegistro', { token: estado.token, codigo: codigo });
+        estado.registro = r.datos;
+        $('regNombre').textContent = r.datos.nombre;
+        $('regAcepto').checked = false;
+        mostrar('sRegConsentimiento');
+        programarRegreso(120000);
+      } catch (e) {
+        manejarError(e);
+      }
+      $('btnRegCodigo').disabled = false;
+    }
+
+    async function iniciarRegistro() {
+      if (!$('regAcepto').checked) return aviso('Primero marca la casilla de autorización', 'alerta');
+      try {
+        var c = await capturarRostro('Registro · ' + estado.registro.nombre, 5);
+        var r = await llamar('enrolar', {
+          token: estado.token, ticket: estado.registro.ticket, descriptores: c.cap.descriptores,
+          foto: c.cap.foto, vida: true, consentimiento: true
+        });
+        c.vigente();
+        resultado(true, 'Rostro registrado', 'Listo, ' + r.datos.nombre + '. Ya puedes marcar con tu código.', c.cap.foto);
+      } catch (e) {
+        if (!e.cancelado) manejarError(e);
+      }
+    }
+
+    // ---------------------------------------------- Resultado y errores
+    function resultado(ok, titulo, detalle, foto) {
+      $('resIcono').textContent = ok ? '✅' : '❌';
+      $('resTitulo').textContent = titulo;
+      $('resTitulo').style.color = ok ? 'var(--ok)' : 'var(--error)';
+      $('resDetalle').textContent = detalle || '';
+      $('resFoto').style.display = foto ? '' : 'none';
+      if (foto) $('resFoto').src = foto;
+      mostrar('sResultado');
+      programarRegreso(ok ? 4000 : 6000);
+    }
+
+    function manejarError(e) {
+      if (e.resultado === 'DISPOSITIVO_NO_AUTORIZADO' || e.resultado === 'TIENDA_INACTIVA') {
+        borrarToken(); estado.token = null;
+        aviso('Este equipo ya no está activado. Pide un código al administrador.', 'error');
+        return reiniciar();
+      }
+      resultado(false, 'No se pudo completar', e.mensaje || e.message || 'Error');
+    }
+
+    arrancar();
+  </script>
+</body>
+</html>
