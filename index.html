@@ -206,11 +206,18 @@
       -webkit-mask: conic-gradient(from 0deg, transparent 0deg, transparent 220deg, #000 360deg);
       mask: conic-gradient(from 0deg, transparent 0deg, transparent 220deg, #000 360deg);
     }
-    .barrido svg { width: 100%; height: 100%; overflow: visible; }
+    .barrido svg { width: 100%; height: 100%; overflow: visible; will-change: transform; }
     .barrido line { stroke: #fff; stroke-width: 2.6; stroke-linecap: round; }
     .escaner.procesando .anillo { opacity: .35; }
+    /*
+     * "Verificando": gira la máscara de brillo, pero las marcas de adentro giran al revés a la misma
+     * velocidad, así que quedan QUIETAS justo encima de las del anillo. Antes giraban las marcas y,
+     * al pasar sobre las fijas, se veía un efecto estroboscopio (parpadeo).
+     */
     .escaner.procesando .barrido { opacity: 1; animation: rotar 2.4s linear infinite; }
+    .escaner.procesando .barrido svg { animation: rotarInverso 2.4s linear infinite; }
     @keyframes rotar { to { transform: rotate(360deg); } }
+    @keyframes rotarInverso { to { transform: rotate(-360deg); } }
     .escaner.exito .anillo line { stroke: var(--ok); }
     .escaner.exito .anillo, .escaner.error .anillo { opacity: 1; }
     .escaner.error .anillo line { stroke: var(--error); }
@@ -482,12 +489,13 @@ var Rostro = (function () {
   // No cambiarlos sin volver a medir.
   var P = {
     alineadoMs: 600,          // tiempo de frente y quieto antes de empezar
-    giroH: 0.16,              // desplazamiento de la nariz a los lados (≈ 12°)
-    giroV: 0.09,              // desplazamiento de la nariz hacia arriba/abajo (≈ 10°)
+    giroH: 0.12,              // desplazamiento de la nariz a los lados (≈ 9°; con 12° a una persona real en laptop le costaba)
+    giroV: 0.07,              // desplazamiento de la nariz hacia arriba/abajo (≈ 8°)
     centro: 0.45,             // fracción del umbral para considerar "de frente" otra vez
-    umbral3D: 0.013,          // apartamiento mínimo de "superficie plana" (fracción del ancho de la cara)
+    umbral3D: 0.012,          // apartamiento mínimo de "superficie plana" (cabeza real a 8–9°: ≥ 0.015; foto: ≤ 0.008)
     mismaPersona: 0.5,        // distancia máxima entre la cara del inicio y la del final
-    perdidaMs: 700,           // si la cara desaparece más que esto a mitad del reto, se reinicia
+    perdidaMs: 3000,          // si la cara desaparece más que esto a mitad del reto, se reinicia
+    perdidaCuenta: 0.75,      // si se pierde la cara (de perfil) tras avanzar esto, el paso cuenta como hecho
     pasoMaxMs: 10000,         // tiempo máximo para cada paso (alinear, cada dirección, volver al frente)
     circuloMaxMs: 15000,      // tiempo máximo para el círculo del registro
     tiempoMaxMs: 30000        // por intento completo (hay un reintento automático)
@@ -842,9 +850,21 @@ var Rostro = (function () {
       var l = leerMediaPipe(marcador.detectForVideo(video, ts));
       diag.cuadros++; diag.ms += performance.now() - ts;
 
-      // ---- Sin cara: en los retos se tolera un instante (de perfil el detector puede perderla)
+      // ---- Sin cara: en los retos se tolera (al girar mucho, de perfil, el detector puede perderla)
       if (!l.cara) {
-        if (fase !== 'alinear' && ultimaCara && ts - ultimaCara > P.perdidaMs) reiniciarRetos('No te salgas del círculo');
+        if (fase === 'reto' && picoActual && picoActual.a >= P.perdidaCuenta) {
+          // Giró de más y la cámara lo perdió de perfil: ya había avanzado lo suficiente, cuenta como hecho.
+          picos.push(picoActual); picoActual = null; fase = 'volver';
+        } else if (fase !== 'alinear' && ultimaCara && ts - ultimaCara > P.perdidaMs) {
+          reiniciarRetos('No te salgas del círculo');
+        } else if (fase === 'reto') {
+          // Se mantiene lo avanzado; solo se avisa (si dura) que vuelva a la cámara.
+          var mantener = {};
+          for (var kk = 0; kk < reto; kk++) mantener[retos[kk]] = 1;
+          mantener[retos[reto]] = picoActual ? Math.max(0, Math.min(picoActual.a, 1)) : 0;
+          cb({ fase: 2, clave: 'reto' + reto, texto: DIRECCIONES[retos[reto]].texto, detalle: 'Regresa un poco hacia la cámara',
+            icono: DIRECCIONES[retos[reto]].icono, cara: false, aviso: true, objetivo: retos[reto], anillo: { tipo: 'dirs', marcados: mantener } });
+        }
         else if (fase === 'alinear') { alineadoDesde = 0; base = []; cb({ fase: 1, clave: 'alinear', texto: 'Mira a la cámara', detalle: l.motivo, icono: 'rostro', cara: false, aviso: true, anillo: { tipo: 'nada' } }); }
         continue;
       }
@@ -895,9 +915,10 @@ var Rostro = (function () {
       if (fase === 'reto') {
         var dir = retos[reto], a = avance(dir, dh, dv);
         if (!picoActual || a > picoActual.a) picoActual = { a: a, puntos: l.puntos, ancho: l.anchoPx };
+        // El anillo muestra lo MÁXIMO alcanzado: nunca retrocede con el ruido (como Face ID).
         var marcados = {};
         for (var k = 0; k < reto; k++) marcados[retos[k]] = 1;
-        marcados[dir] = Math.max(0, Math.min(a, 1));
+        marcados[dir] = Math.max(0, Math.min(picoActual.a, 1));
         cb({ fase: 2, clave: 'reto' + reto, texto: DIRECCIONES[dir].texto, detalle: reto === 0 ? 'Gira despacio la cabeza' : 'Ahora esta dirección',
           icono: DIRECCIONES[dir].icono, cara: true, objetivo: dir, anillo: { tipo: 'dirs', marcados: marcados } });
         if (a >= 1) {
@@ -1079,7 +1100,8 @@ var Rostro = (function () {
       clearTimeout(_espera.timer);
       if (!$('espera').classList.contains('visible')) return Promise.resolve();
       var falta = Math.max(0, 500 - (Date.now() - _espera.desde));
-      return new Promise(function (r) { setTimeout(function () { $('espera').classList.remove('visible'); r(); }, falta); });
+      // Se espera también a que termine de desvanecerse (0.3 s): así no queda flotando sobre la pantalla siguiente.
+      return new Promise(function (r) { setTimeout(function () { $('espera').classList.remove('visible'); setTimeout(r, 300); }, falta); });
     }
 
     // ================================================================ Servidor
@@ -1298,7 +1320,7 @@ var Rostro = (function () {
     }
 
     // ================================================================ Estado general
-    var VERSION_KIOSCO = '4.2';
+    var VERSION_KIOSCO = '4.3';
     var CLAVE_TOKEN = 'asistencia_kiosco_token';
     var estado = { token: null, tienda: null, desfaseMs: 0, ticket: null, persona: null, acciones: [], registro: null, gps: null, timer: null, intento: 0, consentimiento: false };
 
