@@ -86,7 +86,7 @@
     .boton-enlace svg.i { width: 20px; height: 20px; }
 
     /* ================================================================ Indicador de carga (estilo iOS) */
-    .spinner { width: 28px; height: 28px; display: block; will-change: transform; animation: ruedita .9s steps(8) infinite; }
+    .spinner { width: 28px; height: 28px; display: block; will-change: transform; animation: ruedita 1.2s steps(8) infinite; }
     .spinner svg { width: 100%; height: 100%; display: block; }
     .spinner line { stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
     @keyframes ruedita { to { transform: rotate(360deg); } }
@@ -168,6 +168,15 @@
     .accion b { display: block; font-size: 19px; font-weight: 600; }
     .accion small { display: block; color: var(--texto-2); font-size: 14px; margin-top: 2px; }
     .accion .flecha { margin-left: auto; color: var(--texto-3); }
+    .accion small.alerta { color: var(--alerta); font-weight: 600; }
+    .dia { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 2px 0 10px; animation: subir .5s .05s var(--curva) both; }
+    .dia:empty { display: none; }
+    .ficha { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px 6px 9px; border-radius: 999px; background: var(--superficie); box-shadow: var(--sombra); font-size: 13px; color: var(--texto-2); }
+    .ficha svg.i { width: 16px; height: 16px; color: var(--acento); }
+    .ficha b { color: var(--texto); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .cam-sub { color: rgba(255,255,255,.6); font-size: 15px; margin: -2px 0 8px; min-height: 0; text-align: center; }
+    .cam-sub:empty { display: none; }
+    .cam-sub.alerta { color: var(--alerta); font-weight: 600; }
     @keyframes subir { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
     /* ================================================================ Escáner (estilo Face ID) */
@@ -270,8 +279,8 @@
     .espera .caja { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 30px; border-radius: 22px; background: var(--superficie); box-shadow: var(--sombra-alta); color: var(--texto-2); font-size: 15px; font-weight: 500; }
 
     .aviso {
-      position: fixed; left: 50%; top: max(14px, env(safe-area-inset-top)); z-index: 40; display: flex; align-items: center; gap: 10px;
-      max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 18px; font-size: 15px; font-weight: 500;
+      position: fixed; left: 50%; top: calc(max(20px, env(safe-area-inset-top)) + 46px); z-index: 40; display: flex; align-items: center; gap: 10px;
+      width: max-content; max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 18px; font-size: 15px; font-weight: 500;
       background: var(--superficie); color: var(--texto); box-shadow: var(--sombra-alta);
       transform: translate(-50%, -140%); opacity: 0; visibility: hidden;
       transition: transform .45s var(--resorte), opacity .3s, visibility 0s .45s;
@@ -330,6 +339,7 @@
     <div class="columna">
       <div class="avatar" id="avatar"></div>
       <h1 class="titulo" id="saludo"></h1>
+      <div class="dia" id="dia"></div>
       <p class="subtitulo">¿Qué deseas registrar?</p>
       <div class="lista-acciones" id="botonesAccion"></div>
       <div class="espacio"></div>
@@ -375,6 +385,7 @@
   <section class="pantalla" id="sCamara">
     <div class="columna">
       <h1 class="titulo" id="camTitulo"></h1>
+      <p class="cam-sub" id="camSub"></p>
       <div class="pasos" id="pasos"><span></span><span></span><span></span></div>
       <div class="escaner buscando" id="escaner">
         <video id="video"></video>
@@ -403,7 +414,7 @@
       <div class="persona" id="resPersona"><img id="resFoto" alt=""><span id="resNombre"></span></div>
       <div class="espacio"></div>
       <div class="regreso"><i id="resRegreso"></i></div>
-      <button class="boton texto" id="resBoton" onclick="reiniciar()">Listo</button>
+      <button class="boton texto" id="resBoton" onclick="cerrarResultado()">Listo</button>
     </div>
   </section>
 
@@ -453,7 +464,7 @@ var Rostro = (function () {
   var MAX_PARPADEO_MS = 1000;    // un parpadeo humano dura 0.1–0.4 s
   var MAX_MOVIMIENTO_GRADOS = 8; // la cabeza casi no se mueve al parpadear (una foto inclinada sí)
   var ALINEADO_MS = 700;         // tiempo bien encuadrado antes de capturar
-  var PEDIR_PARPADEO_MS = 2000;  // si no parpadea solo en 2 s, se le pide con suavidad
+  var PEDIR_PARPADEO_MS = 2500;  // si no parpadea solo en 2.5 s, se le pide con suavidad
   var TIEMPO_MAX_MS = 12000;     // por intento (hay un reintento automático)
 
   // Método alterno (girar la cabeza)
@@ -485,10 +496,10 @@ var Rostro = (function () {
   function opcRapida() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }); }
   function promedio(a) { return a.reduce(function (s, x) { return s + x; }, 0) / a.length; }
 
-  function lienzoVacio() {
+  function lienzoVacio(w, h) {
     var c = document.createElement('canvas');
-    c.width = 320; c.height = 240;
-    var x = c.getContext('2d'); x.fillStyle = '#777'; x.fillRect(0, 0, 320, 240);
+    c.width = w || 320; c.height = h || 240;
+    var x = c.getContext('2d'); x.fillStyle = '#777'; x.fillRect(0, 0, c.width, c.height);
     return c;
   }
 
@@ -527,10 +538,13 @@ var Rostro = (function () {
         } catch (e) {
           marcador = await mp.FaceLandmarker.createFromOptions(archivos, opciones('CPU'));
         }
-        // La primera detección prepara el procesador gráfico (varios segundos): se hace aquí, no frente a la persona.
-        var c = lienzoVacio(), t = performance.now();
-        marcador.detectForVideo(c, t);
-        marcador.detectForVideo(c, t + 1);
+        // La primera detección prepara el procesador gráfico (varios segundos): se hace aquí, no frente
+        // a la persona, y con los tamaños reales de la cámara (horizontal y vertical) para que no se
+        // vuelva a preparar al abrirla.
+        var t = performance.now();
+        [[640, 480], [480, 640], [320, 240]].forEach(function (tam, i) {
+          marcador.detectForVideo(lienzoVacio(tam[0], tam[1]), t + i * 10);
+        });
         motor = 'mediapipe';
       })().catch(function (e) {
         motor = 'faceapi'; // equipo sin soporte: se usa el método de girar la cabeza
@@ -998,7 +1012,7 @@ var Rostro = (function () {
     };
 
     // ================================================================ Estado general
-    var VERSION_KIOSCO = '4.0';
+    var VERSION_KIOSCO = '4.1';
     var CLAVE_TOKEN = 'asistencia_kiosco_token';
     var estado = { token: null, tienda: null, desfaseMs: 0, ticket: null, persona: null, acciones: [], registro: null, gps: null, timer: null, intento: 0, consentimiento: false };
 
@@ -1138,16 +1152,23 @@ var Rostro = (function () {
         estado.persona = r.datos;
         var acciones = r.datos.acciones;
         if (!acciones.length) {
-          return resultado(false, 'Jornada terminada', 'Ya registraste tu salida de hoy. Hasta mañana, ' + r.datos.nombre + '.');
+          var trabajado = minutosTrabajados(r.datos.hoy, null);
+          return resultado(true, 'Jornada terminada', 'Ya registraste tu salida de hoy' +
+            (trabajado ? ' · trabajaste ' + duracionTexto(trabajado) : '') + '. Hasta mañana, ' + r.datos.nombre + '.');
         }
         if (acciones.length === 1) return marcar(acciones[0]); // el sistema decide: un solo paso posible
         estado.acciones = acciones;
         $('avatar').textContent = inicial(r.datos.nombre);
         $('saludo').textContent = saludo() + ', ' + r.datos.nombre;
+        $('dia').innerHTML = (r.datos.hoy || []).map(function (x) {
+          var t = TIPO[x.tipo] || { icono: 'reloj', titulo: x.tipo };
+          return '<span class="ficha">' + icono(t.icono) + esc(t.titulo) + ' <b>' + esc(x.hora) + '</b></span>';
+        }).join('');
         $('botonesAccion').innerHTML = acciones.map(function (a, i) {
-          var t = TIPO[a.tipo] || { icono: 'reloj', titulo: a.texto, detalle: '' };
+          var t = TIPO[a.tipo] || { icono: 'reloj', titulo: a.texto };
+          var d = detalleAccion(a.tipo, r.datos);
           return '<button class="accion" style="animation-delay:' + (0.08 + i * 0.07) + 's" onclick="marcar(estado.acciones[' + i + '])">' +
-            '<span class="ico">' + icono(t.icono) + '</span><span><b>' + esc(t.titulo) + '</b><small>' + esc(t.detalle) + '</small></span>' +
+            '<span class="ico">' + icono(t.icono) + '</span><span><b>' + esc(t.titulo) + '</b><small class="' + (d.alerta ? 'alerta' : '') + '">' + esc(d.texto) + '</small></span>' +
             '<span class="flecha">' + icono('flecha') + '</span></button>';
         }).join('');
         mostrar('sAcciones');
@@ -1183,6 +1204,7 @@ var Rostro = (function () {
       try {
         await Rostro.iniciar($('video'));
         vigente();
+        Escaner.guia('Mira a la cámara', 'Mantén tu rostro dentro del círculo', 'rostro');
         var cap = null, ultimoError = null;
         for (var intento = 1; intento <= 2 && !cap; intento++) {
           try {
@@ -1217,6 +1239,14 @@ var Rostro = (function () {
       }
     }
 
+    /** Mientras responde el servidor, el mensaje avanza para que se note que sigue trabajando. */
+    function mensajesEspera(lista) {
+      var timers = lista.map(function (m) {
+        return setTimeout(function () { Escaner.guia(m[1], m[2], 'cargando'); }, m[0]);
+      });
+      return function () { timers.forEach(clearTimeout); };
+    }
+
     /** Animación de éxito en el escáner antes de pasar al resultado. */
     async function exitoEscaner(texto) {
       Escaner.estado('final exito');
@@ -1228,27 +1258,101 @@ var Rostro = (function () {
     // ================================================================ Marcaje
     async function marcar(accion) {
       var t = TIPO[accion.tipo] || { titulo: accion.texto, listo: accion.texto + ' registrada' };
+      var d = detalleAccion(accion.tipo, estado.persona);
+      $('camSub').textContent = d.texto;
+      $('camSub').className = 'cam-sub' + (d.alerta ? ' alerta' : '');
       try {
         var esc_ = await escanear(t.titulo, 3);
         var g = await obtenerGps();
-        var lento = setTimeout(function () { Escaner.guia('Guardando registro', 'Casi listo', 'cargando'); }, 3500);
+        var parar = mensajesEspera([
+          [3000, 'Registrando ' + t.titulo.toLowerCase(), 'Guardando tu foto y la hora'],
+          [7000, 'Casi listo', 'Unos segundos más']
+        ]);
         var r;
         try {
           r = await llamar('marcar', {
             token: estado.token, ticket: estado.ticket, tipo: accion.tipo, descriptores: esc_.cap.descriptores,
             foto: esc_.cap.foto, vida: true, lat: g.lat, lng: g.lng, precision: g.precision
           });
-        } finally { clearTimeout(lento); }
+        } finally { parar(); }
         esc_.vigente();
         await exitoEscaner('Identidad confirmada');
         esc_.vigente();
-        resultado(true, t.listo, null, r.datos.hora, r.datos.nombre, esc_.cap.foto);
+        resultado(true, t.listo, detalleResultado(accion.tipo, estado.persona, r.datos.hora), r.datos.hora, r.datos.nombre, esc_.cap.foto);
       } catch (e) {
         if (!e.cancelado) manejarError(e);
       }
     }
 
     // ================================================================ Registro de rostro
+    // ================================================================ Horas del día (todo con la hora del servidor)
+    function minutosDe(hhmm) { var p = String(hhmm || '0:0').split(':'); return Number(p[0]) * 60 + Number(p[1]); }
+    function horaMas(hhmm, min) {
+      var t = (minutosDe(hhmm) + min) % 1440;
+      return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+    }
+    function duracionTexto(min) {
+      min = Math.max(0, Math.round(min));
+      var h = Math.floor(min / 60), m = min % 60;
+      return h ? h + ' h' + (m ? ' ' + m + ' min' : '') : m + ' min';
+    }
+    function ultimo(hoy, tipo) { var l = (hoy || []).filter(function (x) { return x.tipo === tipo; }); return l[l.length - 1]; }
+    /** Minutos trabajados: de la entrada a "hasta" (o a la salida), sin contar el almuerzo. */
+    function minutosTrabajados(hoy, hasta) {
+      var e = ultimo(hoy, 'ENTRADA'), s = hasta ? { hora: hasta } : ultimo(hoy, 'SALIDA');
+      if (!e || !s) return 0;
+      var total = minutosDe(s.hora) - minutosDe(e.hora);
+      var ia = ultimo(hoy, 'INICIO_ALMUERZO'), fa = ultimo(hoy, 'FIN_ALMUERZO');
+      if (ia && fa) total -= minutosDe(fa.hora) - minutosDe(ia.hora);
+      return total;
+    }
+
+    /** Texto debajo de cada opción: explica cuándo aplica y cómo va el día. */
+    function detalleAccion(tipo, d) {
+      d = d || {};
+      switch (tipo) {
+        case 'ENTRADA':
+          return { texto: d.horario && d.horario.entrada ? 'Tu horario: ' + d.horario.entrada + ' a ' + d.horario.salida : 'Iniciar tu jornada' };
+        case 'INICIO_ALMUERZO':
+          return { texto: 'Pausa de hasta ' + (d.minutosAlmuerzo || 60) + ' minutos' };
+        case 'FIN_ALMUERZO':
+          var ia = ultimo(d.hoy, 'INICIO_ALMUERZO');
+          if (!ia) return { texto: 'Volver a tu jornada' };
+          var lleva = minutosDe(d.ahora) - minutosDe(ia.hora), limite = d.minutosAlmuerzo || 60;
+          return lleva > limite
+            ? { texto: 'Llevas ' + duracionTexto(lleva) + ' · te pasaste ' + duracionTexto(lleva - limite), alerta: true }
+            : { texto: 'Saliste a las ' + ia.hora + ' · llevas ' + duracionTexto(lleva) };
+        case 'SALIDA':
+          var e = ultimo(d.hoy, 'ENTRADA');
+          return { texto: e ? 'Entraste a las ' + e.hora : 'Terminar tu jornada' };
+        case 'LLEGADA_VISITA':
+          return { texto: 'Registrar llegada a esta tienda' };
+        case 'SALIDA_VISITA':
+          var v = ultimo(d.hoy, 'LLEGADA_VISITA');
+          return { texto: v ? 'Llegaste a las ' + v.hora : 'Registrar salida de esta tienda' };
+      }
+      return { texto: '' };
+    }
+
+    /** Mensaje del resultado según lo que se registró. */
+    function detalleResultado(tipo, d, hora) {
+      d = d || {};
+      switch (tipo) {
+        case 'ENTRADA': return 'Que tengas un buen día';
+        case 'INICIO_ALMUERZO': return 'Regresa antes de las ' + horaMas(hora, d.minutosAlmuerzo || 60);
+        case 'FIN_ALMUERZO':
+          var ia = ultimo(d.hoy, 'INICIO_ALMUERZO');
+          return ia ? 'Tu almuerzo duró ' + duracionTexto(minutosDe(hora) - minutosDe(ia.hora)) : '';
+        case 'SALIDA':
+          var min = minutosTrabajados(d.hoy, hora);
+          return min ? 'Hoy trabajaste ' + duracionTexto(min) : 'Hasta mañana';
+        case 'SALIDA_VISITA':
+          var v = ultimo(d.hoy, 'LLEGADA_VISITA');
+          return v ? 'Estuviste ' + duracionTexto(minutosDe(hora) - minutosDe(v.hora)) + ' en la tienda' : '';
+      }
+      return '';
+    }
+
     function abrirRegistro() {
       tecladoRegistro.limpiar();
       mostrar('sRegCodigo');
@@ -1285,12 +1389,20 @@ var Rostro = (function () {
     async function iniciarRegistro() {
       if (!estado.consentimiento) return;
       try {
+        $('camSub').textContent = '';
         var esc_ = await escanear('Registro de rostro', 5);
         Escaner.guia('Guardando tu rostro', 'Esto toma unos segundos', 'cargando');
-        var r = await llamar('enrolar', {
-          token: estado.token, ticket: estado.registro.ticket, descriptores: esc_.cap.descriptores,
-          foto: esc_.cap.foto, vida: true, consentimiento: true
-        });
+        var parar = mensajesEspera([
+          [3500, 'Protegiendo tus datos', 'Cifrando tu patrón facial'],
+          [7500, 'Casi listo', 'Unos segundos más']
+        ]);
+        var r;
+        try {
+          r = await llamar('enrolar', {
+            token: estado.token, ticket: estado.registro.ticket, descriptores: esc_.cap.descriptores,
+            foto: esc_.cap.foto, vida: true, consentimiento: true
+          });
+        } finally { parar(); }
         esc_.vigente();
         await exitoEscaner('Rostro guardado');
         esc_.vigente();
@@ -1318,12 +1430,20 @@ var Rostro = (function () {
       $('resFoto').style.display = foto ? '' : 'none';
       if (foto) $('resFoto').src = foto;
       $('resBoton').textContent = ok ? 'Listo' : 'Intentar de nuevo';
+      _resultadoDesde = Date.now();
       var ms = ok ? 6000 : 9000;
       var barra = $('resRegreso');
       barra.style.animation = 'none'; void barra.offsetWidth;
       barra.style.animation = 'vaciar ' + ms + 'ms linear forwards';
       mostrar('sResultado');
       programarRegreso(ms);
+    }
+
+    var _resultadoDesde = 0;
+    /** Un toque accidental justo al aparecer el resultado no lo cierra: se ignora el primer segundo. */
+    function cerrarResultado() {
+      if (Date.now() - _resultadoDesde < 1200) return;
+      reiniciar();
     }
 
     var TITULOS_ERROR = {
