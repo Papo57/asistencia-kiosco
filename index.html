@@ -2,198 +2,399 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <meta name="referrer" content="no-referrer">
   <!-- Solo se permite hablar con Google Apps Script y cargar la librería de rostro: bloquea código inyectado. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src https://script.google.com https://script.googleusercontent.com https://cdn.jsdelivr.net; media-src 'self' blob: mediastream:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#0566B2">
+  <meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <title>Asistencia</title>
   <style>
-  :root {
-    --azul: #0566B2; --azul-claro: #106EBE; --fondo: #F7FBFF; --tarjeta: #FCFEFF;
-    --texto: #323130; --gris: #6E6E6E; --borde: #E1DFDD;
-    --ok: #107C10; --error: #A80000; --alerta: #C77700;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: var(--fondo); color: var(--texto); }
-  .contenedor { max-width: 760px; margin: 0 auto; padding: 12px 16px 80px; }
-  header { display: flex; align-items: center; gap: 10px; padding: 12px 0; }
-  header .icono { font-size: 34px; }
-  header small { display: block; font-size: 13px; color: var(--gris); }
-  header strong { font-size: 20px; }
-  h2 { font-size: 17px; margin: 18px 0 8px; }
+    /* ================================================================ Sistema de diseño */
+    :root {
+      --fondo: #F5F5F7;
+      --superficie: #FFFFFF;
+      --superficie-2: #FBFBFD;
+      --texto: #1D1D1F;
+      --texto-2: #6E6E73;
+      --texto-3: #AEAEB2;
+      --linea: rgba(0, 0, 0, .08);
+      --acento: #0566B2;
+      --acento-2: #2C8BE0;
+      --acento-suave: rgba(5, 102, 178, .10);
+      --ok: #30B455;
+      --error: #E5352B;
+      --alerta: #F29D0B;
+      --sombra: 0 1px 1px rgba(0,0,0,.03), 0 6px 20px rgba(0,0,0,.06);
+      --sombra-alta: 0 2px 6px rgba(0,0,0,.05), 0 20px 50px rgba(0,0,0,.12);
+      --curva: cubic-bezier(.22, .9, .24, 1);
+      --resorte: cubic-bezier(.34, 1.56, .64, 1);
+      --fuente: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --fuente-titulo: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fondo: #000000; --superficie: #1C1C1E; --superficie-2: #2C2C2E;
+        --texto: #F5F5F7; --texto-2: #98989D; --texto-3: #636366; --linea: rgba(255,255,255,.10);
+        --acento: #3B95F0; --acento-2: #64AEFF; --acento-suave: rgba(59, 149, 240, .16);
+        --sombra: 0 0 0 1px rgba(255,255,255,.04); --sombra-alta: 0 0 0 1px rgba(255,255,255,.06), 0 20px 50px rgba(0,0,0,.6);
+      }
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--fondo); color: var(--texto); font-family: var(--fuente);
+      -webkit-font-smoothing: antialiased; user-select: none; -webkit-user-select: none; overflow: hidden;
+      font-feature-settings: 'tnum' 0;
+    }
+    button { font-family: inherit; border: 0; cursor: pointer; color: inherit; background: none; }
+    svg.i { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
-  button, .boton {
-    border: 0; border-radius: 30px; padding: 12px 18px; font-size: 15px; font-weight: 700;
-    background: var(--azul); color: #fff; cursor: pointer;
-  }
-  button:disabled { opacity: .5; cursor: default; }
-  button.secundario { background: #fff; color: var(--azul); border: 2px solid var(--azul); }
-  button.peligro { background: var(--error); }
-  button.chico { padding: 6px 12px; font-size: 13px; }
-  button.bloque { width: 100%; }
+    /* ================================================================ Pantallas */
+    .pantalla {
+      position: fixed; inset: 0; display: none; flex-direction: column; align-items: center;
+      padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+      overflow-y: auto;
+    }
+    .pantalla.visible { display: flex; animation: entrar .5s var(--curva) both; }
+    @keyframes entrar { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+    .columna { width: 100%; max-width: 440px; display: flex; flex-direction: column; align-items: center; flex: 1; }
+    .espacio { flex: 1; min-height: 12px; }
 
-  .pestanas { display: flex; gap: 8px; margin: 8px 0 12px; }
-  .pestanas button { flex: 1; background: #fff; color: var(--azul); border: 2px solid var(--azul); }
-  .pestanas button.activa { background: var(--azul); color: #fff; }
+    .titulo { font-family: var(--fuente-titulo); font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin: 14px 0 6px; text-align: center; }
+    .subtitulo { color: var(--texto-2); font-size: 16px; line-height: 1.4; text-align: center; margin: 0 0 8px; max-width: 340px; }
+    .icono-grande {
+      width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center;
+      background: var(--acento-suave); color: var(--acento); margin-top: 6vh;
+    }
+    .icono-grande svg.i { width: 36px; height: 36px; stroke-width: 1.6; }
 
-  .tarjeta {
-    background: var(--tarjeta); border-radius: 15px; padding: 12px; margin-bottom: 10px;
-    box-shadow: 0 1px 4px rgba(0,0,0,.08);
-  }
-  .tarjeta .titulo { font-weight: 700; font-size: 16px; }
-  .tarjeta .sub { color: var(--gris); font-size: 13px; margin-top: 2px; }
-  .tarjeta .acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .etiqueta { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; margin: 4px 4px 0 0; }
-  .etiqueta.ok { background: #DFF6DD; color: var(--ok); }
-  .etiqueta.mal { background: #FDE7E9; color: var(--error); }
-  .etiqueta.neutra { background: #EDEBE9; color: var(--texto); }
+    /* ================================================================ Botones */
+    .boton {
+      width: 100%; min-height: 56px; border-radius: 16px; font-size: 17px; font-weight: 600;
+      background: var(--acento); color: #fff; display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: transform .2s var(--curva), opacity .2s, background .2s;
+    }
+    .boton:active { transform: scale(.97); opacity: .9; }
+    .boton:disabled { opacity: .35; transform: none; }
+    .boton.secundario { background: var(--acento-suave); color: var(--acento); }
+    .boton.texto { background: none; color: var(--acento); min-height: 44px; font-weight: 500; font-size: 16px; }
+    .boton-enlace { color: var(--texto-2); font-size: 15px; padding: 12px; display: inline-flex; align-items: center; gap: 8px; }
+    .boton-enlace svg.i { width: 20px; height: 20px; }
 
-  label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
-  input, select {
-    width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--borde); border-radius: 8px; background: #fff;
-  }
-  .fila2 { display: flex; gap: 10px; }
-  .fila2 > div { flex: 1; }
-  .check { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-weight: 400; }
-  .check input { width: auto; }
+    /* ================================================================ Indicador de carga (estilo iOS) */
+    .spinner { position: relative; width: 28px; height: 28px; }
+    .spinner span {
+      position: absolute; left: 46%; top: 0; width: 8%; height: 28%; border-radius: 4px; background: currentColor;
+      transform-origin: 50% 178%; opacity: .15; animation: aspa 1s linear infinite;
+    }
+    @keyframes aspa { from { opacity: 1; } to { opacity: .15; } }
 
-  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
-  .modal.abierto { display: flex; }
-  .modal .caja {
-    background: #fff; width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto;
-    border-radius: 18px 18px 0 0; padding: 18px 16px 24px;
-  }
-  @media (min-width: 600px) { .modal { align-items: center; } .modal .caja { border-radius: 18px; } }
-  .modal h3 { margin: 0 0 6px; }
-  .modal .botones { display: flex; gap: 8px; margin-top: 16px; }
-  .modal .botones button { flex: 1; }
+    /* ================================================================ Arranque */
+    .marca {
+      width: 88px; height: 88px; border-radius: 26px; margin-top: 30vh; display: grid; place-items: center; color: #fff;
+      background: linear-gradient(160deg, var(--acento-2), var(--acento)); box-shadow: var(--sombra-alta);
+      animation: latido 2.4s var(--curva) infinite;
+    }
+    .marca svg.i { width: 46px; height: 46px; stroke-width: 1.7; }
+    @keyframes latido { 0%, 100% { transform: scale(1); } 50% { transform: scale(.96); } }
+    .barra-carga { width: 140px; height: 4px; border-radius: 4px; background: var(--linea); overflow: hidden; margin-top: 28px; }
+    .barra-carga::after { content: ''; display: block; width: 40%; height: 100%; border-radius: 4px; background: var(--acento); animation: deslizar 1.2s var(--curva) infinite; }
+    @keyframes deslizar { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
 
-  .camara { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 12px; overflow: hidden; margin-top: 10px; }
-  .camara video, .camara img { width: 100%; height: 100%; object-fit: cover; }
-  .camara video { transform: scaleX(-1); }
-  .instruccion { text-align: center; font-weight: 700; font-size: 17px; min-height: 26px; margin: 10px 0; color: var(--azul); }
+    /* ================================================================ Inicio */
+    .encabezado { width: 100%; max-width: 440px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .tienda { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .tienda span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tienda svg.i { width: 20px; height: 20px; color: var(--acento); }
+    .pastilla {
+      display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px;
+      background: var(--superficie); box-shadow: var(--sombra); font-size: 13px; color: var(--texto-2); white-space: nowrap;
+    }
+    .punto { width: 8px; height: 8px; border-radius: 50%; background: var(--texto-3); }
+    .punto.ok { background: var(--ok); }
+    .punto.buscando { background: var(--alerta); animation: pulso 1.4s ease-in-out infinite; }
+    .punto.mal { background: var(--error); }
+    @keyframes pulso { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
-  .codigo-grande { font-size: 44px; letter-spacing: 10px; text-align: center; font-weight: 800; color: var(--azul); margin: 16px 0; }
-  .nota { font-size: 13px; color: var(--gris); }
-  .vacio { text-align: center; color: var(--gris); padding: 24px; }
+    .reloj {
+      font-family: var(--fuente-titulo); font-size: clamp(64px, 21vw, 104px); font-weight: 700; letter-spacing: -.035em;
+      line-height: 1; margin-top: 4vh; font-variant-numeric: tabular-nums;
+    }
+    .fecha { color: var(--texto-2); font-size: 18px; margin-top: 6px; }
+    .indicacion { margin-top: 4.5vh; font-size: 17px; font-weight: 500; transition: color .2s; }
+    .indicacion.mal { color: var(--error); }
 
-  .aviso {
-    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%) translateY(120px);
-    max-width: 92%; padding: 12px 18px; border-radius: 12px; color: #fff; font-weight: 600;
-    transition: transform .25s; z-index: 20; background: var(--azul);
-  }
-  .aviso.visible { transform: translateX(-50%) translateY(0); }
-  .aviso.ok { background: var(--ok); }
-  .aviso.error { background: var(--error); }
-  .aviso.alerta { background: var(--alerta); }
-</style>
+    .puntos { display: flex; gap: 22px; margin: 16px 0 26px; height: 16px; }
+    .puntos span { width: 14px; height: 14px; border-radius: 50%; border: 1.6px solid var(--texto); transition: background .15s, border-color .2s; }
+    .puntos span.lleno { background: var(--texto); animation: pop .25s var(--resorte); }
+    .puntos.error span { border-color: var(--error); background: var(--error); }
+    .puntos.sacudir { animation: sacudir .5s cubic-bezier(.36, .07, .19, .97); }
+    @keyframes pop { 0% { transform: scale(.6); } 100% { transform: scale(1); } }
+    @keyframes sacudir {
+      10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); }
+      30%, 50%, 70% { transform: translateX(-9px); } 40%, 60% { transform: translateX(9px); }
+    }
 
-  <style>
-    body { user-select: none; -webkit-user-select: none; }
-    .pantalla { display: none; max-width: 520px; margin: 0 auto; padding: 16px; text-align: center; }
-    .pantalla.visible { display: block; }
-    .barra { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; }
-    .barra .tienda { font-weight: 800; color: var(--azul); font-size: 18px; text-align: left; }
-    .barra .gps { font-size: 12px; color: var(--gris); }
-    .reloj { font-size: 64px; font-weight: 800; margin: 10px 0 0; font-variant-numeric: tabular-nums; }
-    .fecha { color: var(--gris); margin-bottom: 18px; }
-    .puntos { display: flex; justify-content: center; gap: 16px; margin: 14px 0 20px; }
-    .puntos span { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--azul); }
-    .puntos span.lleno { background: var(--azul); }
-    .teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 360px; margin: 0 auto; }
-    .teclado button { font-size: 30px; padding: 18px 0; border-radius: 18px; background: #fff; color: var(--texto); box-shadow: 0 2px 6px rgba(0,0,0,.12); }
-    .teclado button:active { background: #e6f0fa; }
-    .teclado .ok { background: var(--azul); color: #fff; }
-    .saludo { font-size: 28px; font-weight: 800; margin: 24px 0 6px; }
-    .grande { display: block; width: 100%; font-size: 24px; padding: 22px; margin-top: 14px; border-radius: 22px; }
-    .icono-resultado { font-size: 90px; margin-top: 30px; }
-    .titulo-resultado { font-size: 28px; font-weight: 800; margin: 8px 0; }
-    .foto-resultado { width: 160px; height: 120px; object-fit: cover; border-radius: 12px; margin-top: 12px; }
-    .camara { max-width: 480px; margin: 10px auto 0; }
-    .enlace { background: none; color: var(--gris); font-weight: 400; font-size: 14px; margin-top: 26px; text-decoration: underline; }
-    .campo-codigo { text-align: center; font-size: 26px; letter-spacing: 8px; margin-top: 12px; }
-    .check { text-align: left; }
+    .teclado { display: grid; grid-template-columns: repeat(3, 78px); gap: 16px 26px; justify-content: center; }
+    .tecla {
+      width: 78px; height: 78px; border-radius: 50%; background: var(--superficie); box-shadow: var(--sombra);
+      font-family: var(--fuente-titulo); font-size: 34px; font-weight: 400; display: grid; place-items: center;
+      transition: transform .12s var(--curva), background .25s;
+    }
+    .tecla:active, .tecla.presionada { transform: scale(.9); background: var(--acento-suave); transition: transform .05s, background 0s; }
+    .tecla.vacia { visibility: hidden; }
+    .tecla.accion { background: none; box-shadow: none; color: var(--texto-2); }
+    .tecla.accion svg.i { width: 30px; height: 30px; stroke-width: 1.6; }
+
+    /* ================================================================ Acciones */
+    .avatar {
+      width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; margin-top: 7vh;
+      font-family: var(--fuente-titulo); font-size: 36px; font-weight: 600; color: #fff;
+      background: linear-gradient(160deg, var(--acento-2), var(--acento)); box-shadow: var(--sombra-alta);
+      animation: aparecer .6s var(--resorte) both;
+    }
+    @keyframes aparecer { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+    .lista-acciones { width: 100%; display: flex; flex-direction: column; gap: 12px; margin-top: 22px; }
+    .accion {
+      width: 100%; display: flex; align-items: center; gap: 16px; padding: 18px; border-radius: 20px; text-align: left;
+      background: var(--superficie); box-shadow: var(--sombra); transition: transform .2s var(--curva);
+      animation: subir .5s var(--curva) both;
+    }
+    .accion:active { transform: scale(.975); }
+    .accion .ico { width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center; background: var(--acento-suave); color: var(--acento); flex: none; }
+    .accion .ico svg.i { width: 28px; height: 28px; }
+    .accion b { display: block; font-size: 19px; font-weight: 600; }
+    .accion small { display: block; color: var(--texto-2); font-size: 14px; margin-top: 2px; }
+    .accion .flecha { margin-left: auto; color: var(--texto-3); }
+    @keyframes subir { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+    /* ================================================================ Escáner (estilo Face ID) */
+    #sCamara { background: #000; color: #fff; }
+    #sCamara .titulo { font-size: 22px; margin-top: 2vh; color: rgba(255,255,255,.95); }
+    .pasos { display: flex; gap: 6px; margin-top: 4px; height: 6px; }
+    .pasos span { width: 22px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.22); transition: background .3s, width .3s var(--curva); }
+    .pasos span.activo { width: 34px; background: #fff; }
+    .pasos span.hecho { background: var(--ok); }
+
+    .escaner { position: relative; width: min(82vw, 360px); aspect-ratio: 1; margin-top: 4vh; }
+    .escaner video, .escaner .congelada {
+      position: absolute; inset: 11%; width: 78%; height: 78%; border-radius: 50%; object-fit: cover;
+      transform: scaleX(-1); background: #111;
+    }
+    .escaner .congelada { display: none; transform: none; }
+    .escaner.final .congelada { display: block; }
+    .escaner svg.anillo { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .anillo line { stroke: rgba(255,255,255,.22); stroke-width: 2.6; stroke-linecap: round; transition: stroke .25s; }
+    .anillo line.on { stroke: #fff; }
+    .escaner.buscando .anillo { animation: respirar 1.8s ease-in-out infinite; }
+    @keyframes respirar { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+    .escaner.procesando .anillo line { stroke: rgba(255,255,255,.18); animation: cometa 1.1s linear infinite; }
+    @keyframes cometa { 0% { stroke: #fff; } 35%, 100% { stroke: rgba(255,255,255,.18); } }
+    .escaner.exito .anillo line { stroke: var(--ok); }
+    .escaner.error .anillo line { stroke: var(--error); }
+    .escaner.error { animation: sacudir .5s cubic-bezier(.36, .07, .19, .97); }
+
+    .sello {
+      position: absolute; inset: 11%; border-radius: 50%; display: grid; place-items: center;
+      background: rgba(0,0,0,.35); opacity: 0; transition: opacity .3s;
+    }
+    .escaner.exito .sello { opacity: 1; }
+    .sello svg { width: 38%; height: 38%; }
+    .sello circle { fill: var(--ok); }
+    .sello path { fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 34; stroke-dashoffset: 34; }
+    .escaner.exito .sello path { animation: trazo .45s .15s var(--curva) forwards; }
+    @keyframes trazo { to { stroke-dashoffset: 0; } }
+
+    .guia { min-height: 96px; margin-top: 4vh; text-align: center; display: flex; flex-direction: column; align-items: center; }
+    .guia .glifo { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.12); margin-bottom: 12px; }
+    .guia .glifo svg.i { width: 24px; height: 24px; }
+    .guia .glifo.ojo svg { animation: parpadeo 2.4s ease-in-out infinite; transform-origin: center; }
+    @keyframes parpadeo { 0%, 40%, 60%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.1); } }
+    .guia .glifo.giro svg { animation: girar 2.6s ease-in-out infinite; }
+    @keyframes girar { 0%, 100% { transform: rotateY(0); } 30% { transform: rotateY(55deg); } 70% { transform: rotateY(-55deg); } }
+    .guia h2 { font-family: var(--fuente-titulo); font-size: 24px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+    .guia p { color: rgba(255,255,255,.6); font-size: 16px; margin: 6px 0 0; min-height: 22px; }
+    .cambio { animation: fundido .35s var(--curva); }
+    @keyframes fundido { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    #sCamara .boton.texto { color: rgba(255,255,255,.85); margin-top: auto; }
+
+    /* ================================================================ Resultado */
+    .resultado-icono { width: 104px; height: 104px; margin-top: 10vh; }
+    .resultado-icono circle { fill: none; stroke-width: 3; stroke-dasharray: 302; stroke-dashoffset: 302; animation: trazo .6s var(--curva) forwards; }
+    .resultado-icono path { fill: none; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 60; stroke-dashoffset: 60; animation: trazo .45s .45s var(--curva) forwards; }
+    .resultado-icono.ok circle, .resultado-icono.ok path { stroke: var(--ok); }
+    .resultado-icono.mal circle, .resultado-icono.mal path { stroke: var(--error); }
+    .hora-grande { font-family: var(--fuente-titulo); font-size: 64px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; margin: 4px 0 0; animation: subir .6s .2s var(--curva) both; }
+    .persona { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 10px 18px 10px 10px; border-radius: 999px; background: var(--superficie); box-shadow: var(--sombra); animation: subir .6s .3s var(--curva) both; }
+    .persona img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+    .persona span { font-weight: 600; font-size: 17px; }
+    .regreso { width: 120px; height: 4px; border-radius: 4px; background: var(--linea); overflow: hidden; margin: 22px 0 6px; }
+    .regreso i { display: block; height: 100%; background: var(--texto-3); transform-origin: left; animation: vaciar linear forwards; }
+    @keyframes vaciar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+    /* ================================================================ Consentimiento */
+    .tarjeta { width: 100%; background: var(--superficie); border-radius: 20px; box-shadow: var(--sombra); padding: 6px 18px; margin-top: 20px; }
+    .fila { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--linea); }
+    .fila:last-child { border-bottom: 0; }
+    .fila svg.i { color: var(--acento); margin-top: 1px; }
+    .fila div { font-size: 15px; line-height: 1.4; color: var(--texto-2); }
+    .fila b { color: var(--texto); font-weight: 600; display: block; font-size: 16px; }
+    .interruptor { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 0 6px; text-align: left; font-size: 15px; line-height: 1.4; color: var(--texto-2); }
+    .interruptor .riel { position: relative; width: 51px; height: 31px; border-radius: 16px; background: var(--linea); flex: none; transition: background .25s; }
+    .interruptor .riel::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0,0,0,.15), 0 1px 1px rgba(0,0,0,.16); transition: transform .3s var(--resorte); }
+    .interruptor.on .riel { background: var(--ok); }
+    .interruptor.on .riel::after { transform: translateX(20px); }
+
+    /* ================================================================ Capa de espera y avisos */
+    .espera {
+      position: fixed; inset: 0; display: grid; place-items: center; z-index: 30; opacity: 0; pointer-events: none;
+      background: rgba(245, 245, 247, .55); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); transition: opacity .25s;
+    }
+    @media (prefers-color-scheme: dark) { .espera { background: rgba(0,0,0,.5); } }
+    .espera.visible { opacity: 1; pointer-events: auto; }
+    .espera .caja { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 30px; border-radius: 22px; background: var(--superficie); box-shadow: var(--sombra-alta); color: var(--texto-2); font-size: 15px; font-weight: 500; }
+
+    .aviso {
+      position: fixed; left: 50%; top: max(14px, env(safe-area-inset-top)); z-index: 40; display: flex; align-items: center; gap: 10px;
+      max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 18px; font-size: 15px; font-weight: 500;
+      background: var(--superficie); color: var(--texto); box-shadow: var(--sombra-alta);
+      transform: translate(-50%, -140%); opacity: 0; visibility: hidden;
+      transition: transform .45s var(--resorte), opacity .3s, visibility 0s .45s;
+    }
+    .aviso.visible { transform: translate(-50%, 0); opacity: 1; visibility: visible; transition: transform .45s var(--resorte), opacity .2s; }
+    .aviso svg.i { width: 22px; height: 22px; }
+    .aviso.ok svg.i { color: var(--ok); } .aviso.error svg.i { color: var(--error); } .aviso.alerta svg.i { color: var(--alerta); }
+
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+    @media (max-height: 700px) { .teclado { gap: 12px 24px; grid-template-columns: repeat(3, 70px); } .tecla { width: 70px; height: 70px; font-size: 30px; } .reloj { margin-top: 2vh; } .indicacion { margin-top: 2.5vh; } }
   </style>
 </head>
 <body>
-  <!-- Cargando -->
-  <div class="pantalla visible" id="sCargando"><div class="icono-resultado">🕒</div><p id="cargandoTexto">Cargando…</p></div>
-
-  <!-- Activación del equipo -->
-  <div class="pantalla" id="sActivar">
-    <div class="icono-resultado">🔒</div>
-    <div class="titulo-resultado">Activa este equipo</div>
-    <p class="nota">Pide al administrador el código de activación de esta tienda. Debes estar dentro de la tienda.</p>
-    <input id="actCodigo" class="campo-codigo" inputmode="numeric" maxlength="6" placeholder="······" autocomplete="off">
-    <button class="grande" id="btnActivar" onclick="activar()">Activar</button>
-    <p class="nota" id="actEstado"></p>
-  </div>
-
-  <!-- Inicio: código personal -->
-  <div class="pantalla" id="sInicio">
-    <div class="barra"><div class="tienda" id="nomTienda"></div><div class="gps" id="gpsEstado">📍 …</div></div>
-    <div class="reloj" id="reloj">--:--</div>
-    <div class="fecha" id="fecha"></div>
-    <div>Escribe tu código</div>
-    <div class="puntos" id="puntos"></div>
-    <div class="teclado">
-      <button onclick="tecla('1')">1</button><button onclick="tecla('2')">2</button><button onclick="tecla('3')">3</button>
-      <button onclick="tecla('4')">4</button><button onclick="tecla('5')">5</button><button onclick="tecla('6')">6</button>
-      <button onclick="tecla('7')">7</button><button onclick="tecla('8')">8</button><button onclick="tecla('9')">9</button>
-      <button onclick="borrar()">⌫</button><button onclick="tecla('0')">0</button><button class="ok" id="btnOk" onclick="identificar()">OK</button>
+  <!-- ======================================================== Arranque -->
+  <section class="pantalla visible" id="sCargando">
+    <div class="columna">
+      <div class="marca"><svg class="i" viewBox="0 0 24 24" data-i="reloj"></svg></div>
+      <div class="barra-carga" id="cargaBarra"></div>
+      <p class="subtitulo" id="cargandoTexto" style="margin-top:16px">Preparando</p>
+      <button class="boton secundario" id="btnReintentar" style="display:none;max-width:220px;margin-top:12px" onclick="location.reload()">Reintentar</button>
     </div>
-    <button class="enlace" onclick="abrirRegistro()">Registrar rostro (con código del administrador)</button>
-  </div>
+  </section>
 
-  <!-- Elegir acción -->
-  <div class="pantalla" id="sAcciones">
-    <div class="saludo" id="saludo"></div>
-    <div class="nota">¿Qué deseas registrar?</div>
-    <div id="botonesAccion"></div>
-    <button class="grande secundario" onclick="reiniciar()">Cancelar</button>
-  </div>
+  <!-- ======================================================== Activación -->
+  <section class="pantalla" id="sActivar">
+    <div class="columna">
+      <div class="icono-grande"><svg class="i" viewBox="0 0 24 24" data-i="candado"></svg></div>
+      <h1 class="titulo">Activa este equipo</h1>
+      <p class="subtitulo">Escribe el código de activación que te dio el administrador. Debes estar dentro de la tienda.</p>
+      <div class="puntos" id="actPuntos"></div>
+      <div class="teclado" id="actTeclado"></div>
+      <div class="espacio"></div>
+    </div>
+  </section>
 
-  <!-- Registro de rostro: código -->
-  <div class="pantalla" id="sRegCodigo">
-    <div class="icono-resultado">🙂</div>
-    <div class="titulo-resultado">Registrar rostro</div>
-    <p class="nota">Escribe el código de registro que generó el administrador para esta persona.</p>
-    <input id="regCodigo" class="campo-codigo" inputmode="numeric" maxlength="6" placeholder="······" autocomplete="off">
-    <button class="grande" id="btnRegCodigo" onclick="validarRegistro()">Continuar</button>
-    <button class="grande secundario" onclick="reiniciar()">Cancelar</button>
-  </div>
+  <!-- ======================================================== Inicio -->
+  <section class="pantalla" id="sInicio">
+    <div class="encabezado">
+      <div class="tienda"><svg class="i" viewBox="0 0 24 24" data-i="tienda"></svg><span id="nomTienda"></span></div>
+      <div class="pastilla"><i class="punto buscando" id="gpsPunto"></i><span id="gpsTexto">Ubicando</span></div>
+    </div>
+    <div class="columna">
+      <div class="reloj" id="reloj">--:--</div>
+      <div class="fecha" id="fecha"></div>
+      <div class="indicacion" id="indicacion">Ingresa tu código</div>
+      <div class="puntos" id="puntos"></div>
+      <div class="teclado" id="teclado"></div>
+      <div class="espacio"></div>
+      <button class="boton-enlace" onclick="abrirRegistro()"><svg class="i" viewBox="0 0 24 24" data-i="rostro"></svg>Registrar rostro</button>
+    </div>
+  </section>
 
-  <!-- Registro de rostro: consentimiento -->
-  <div class="pantalla" id="sRegConsentimiento">
-    <div class="saludo" id="regNombre"></div>
-    <p class="nota">Con buena luz de frente. Sin gorra, lentes oscuros ni mascarilla.</p>
-    <label class="check"><input type="checkbox" id="regAcepto">
-      Autorizo que se guarde mi foto y un patrón numérico de mi rostro únicamente para verificar mi identidad al registrar asistencia.</label>
-    <button class="grande" onclick="iniciarRegistro()">Comenzar</button>
-    <button class="grande secundario" onclick="reiniciar()">Cancelar</button>
-  </div>
+  <!-- ======================================================== Elegir acción -->
+  <section class="pantalla" id="sAcciones">
+    <div class="columna">
+      <div class="avatar" id="avatar"></div>
+      <h1 class="titulo" id="saludo"></h1>
+      <p class="subtitulo">¿Qué deseas registrar?</p>
+      <div class="lista-acciones" id="botonesAccion"></div>
+      <div class="espacio"></div>
+      <button class="boton texto" onclick="reiniciar()">Cancelar</button>
+    </div>
+  </section>
 
-  <!-- Cámara -->
-  <div class="pantalla" id="sCamara">
-    <div class="saludo" id="camTitulo"></div>
-    <div class="camara"><video id="video"></video></div>
-    <div class="instruccion" id="instruccion"></div>
-    <button class="secundario" onclick="reiniciar()">Cancelar</button>
-  </div>
+  <!-- ======================================================== Registro de rostro: código -->
+  <section class="pantalla" id="sRegCodigo">
+    <div class="columna">
+      <div class="icono-grande"><svg class="i" viewBox="0 0 24 24" data-i="rostro"></svg></div>
+      <h1 class="titulo">Registrar rostro</h1>
+      <p class="subtitulo">Escribe el código de registro que generó el administrador para esta persona.</p>
+      <div class="puntos" id="regPuntos"></div>
+      <div class="teclado" id="regTeclado"></div>
+      <div class="espacio"></div>
+      <button class="boton texto" onclick="reiniciar()">Cancelar</button>
+    </div>
+  </section>
 
-  <!-- Resultado -->
-  <div class="pantalla" id="sResultado">
-    <div class="icono-resultado" id="resIcono"></div>
-    <div class="titulo-resultado" id="resTitulo"></div>
-    <div id="resDetalle" style="font-size:20px"></div>
-    <img class="foto-resultado" id="resFoto" alt="" style="display:none">
-    <p class="nota">Volviendo al inicio…</p>
-  </div>
+  <!-- ======================================================== Registro de rostro: consentimiento -->
+  <section class="pantalla" id="sRegConsentimiento">
+    <div class="columna">
+      <div class="avatar" id="regAvatar"></div>
+      <h1 class="titulo" id="regNombre"></h1>
+      <p class="subtitulo">Antes de empezar</p>
+      <div class="tarjeta">
+        <div class="fila"><svg class="i" viewBox="0 0 24 24" data-i="sol"></svg><div><b>Buena luz de frente</b>Evita tener una ventana o lámpara detrás.</div></div>
+        <div class="fila"><svg class="i" viewBox="0 0 24 24" data-i="rostro"></svg><div><b>Rostro descubierto</b>Sin gorra, lentes oscuros ni mascarilla.</div></div>
+        <div class="fila"><svg class="i" viewBox="0 0 24 24" data-i="escudo"></svg><div><b>Tus datos están protegidos</b>Solo se usan para verificar tu identidad al registrar asistencia.</div></div>
+      </div>
+      <button class="interruptor" id="regAcepto" onclick="alternarConsentimiento()">
+        <span class="riel"></span>
+        <span>Autorizo que se guarde mi foto y un patrón numérico de mi rostro para verificar mi identidad.</span>
+      </button>
+      <div class="espacio"></div>
+      <button class="boton" id="btnComenzar" onclick="iniciarRegistro()" disabled>Comenzar</button>
+      <button class="boton texto" onclick="reiniciar()">Cancelar</button>
+    </div>
+  </section>
 
-  <div class="aviso" id="aviso"></div>
+  <!-- ======================================================== Escáner -->
+  <section class="pantalla" id="sCamara">
+    <div class="columna">
+      <h1 class="titulo" id="camTitulo"></h1>
+      <div class="pasos" id="pasos"><span></span><span></span><span></span></div>
+      <div class="escaner buscando" id="escaner">
+        <video id="video"></video>
+        <img class="congelada" id="congelada" alt="">
+        <svg class="anillo" id="anillo" viewBox="0 0 200 200"></svg>
+        <div class="sello"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="25"/><path d="M15 27l7 7 15-16"/></svg></div>
+      </div>
+      <div class="guia" id="guia">
+        <div class="glifo" id="glifo"></div>
+        <h2 id="guiaTexto">Preparando cámara</h2>
+        <p id="guiaDetalle"></p>
+      </div>
+      <button class="boton texto" onclick="reiniciar()">Cancelar</button>
+    </div>
+  </section>
+
+  <!-- ======================================================== Resultado -->
+  <section class="pantalla" id="sResultado">
+    <div class="columna">
+      <svg class="resultado-icono" id="resIcono" viewBox="0 0 104 104"><circle cx="52" cy="52" r="48"/><path id="resTrazo" d=""/></svg>
+      <h1 class="titulo" id="resTitulo"></h1>
+      <div class="hora-grande" id="resHora"></div>
+      <p class="subtitulo" id="resDetalle"></p>
+      <div class="persona" id="resPersona"><img id="resFoto" alt=""><span id="resNombre"></span></div>
+      <div class="espacio"></div>
+      <div class="regreso"><i id="resRegreso"></i></div>
+      <button class="boton texto" id="resBoton" onclick="reiniciar()">Listo</button>
+    </div>
+  </section>
+
+  <div class="espera" id="espera"><div class="caja"><div class="spinner" id="esperaSpinner"></div><span id="esperaTexto">Verificando</span></div></div>
+  <div class="aviso" id="aviso"><svg class="i" viewBox="0 0 24 24" id="avisoIcono"></svg><span id="avisoTexto"></span></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
   <script>
@@ -205,29 +406,41 @@
   </script>
   <script>
     /**
- * Módulo de rostro (navegador) del kiosco. Usa @vladmandic/face-api (cargado desde jsDelivr).
+ * Módulo de rostro del kiosco. Usa @vladmandic/face-api (cargado desde jsDelivr).
  *   await Rostro.iniciar(videoEl)
- *   const vivo = await Rostro.pruebaVida(avisar)          // parpadeo + giro, orden aleatorio
- *   const { descriptores, foto } = await Rostro.capturar(5, avisar)
+ *   const vivo = await Rostro.pruebaVida(cb)        // cerrar ojos + girar cabeza, orden aleatorio
+ *   const { descriptores, foto } = await Rostro.capturar(n, cb)
  *   Rostro.detener()
+ * cb recibe { texto, detalle, icono, cara, progreso } para pintar la interfaz.
  * Solo calcula descriptores; la comparación de identidad se hace en el servidor.
  */
 var Rostro = (function () {
   var MODELOS = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model/';
-  var video = null, stream = null, modelosListos = false;
+  var video = null, stream = null, listo = false, cargando = null;
+  var TIEMPO_RETO_MS = 20000;
 
   function esperar(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  function opcRapida() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }); }
-  function opcPrecisa() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 }); }
+  function opcVida() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }); }
+  function opcCaptura() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }); }
 
-  async function cargarModelos() {
-    if (modelosListos) return;
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODELOS),
-      faceapi.nets.faceLandmark68Net.loadFromUri(MODELOS),
-      faceapi.nets.faceRecognitionNet.loadFromUri(MODELOS)
-    ]);
-    modelosListos = true;
+  /** Carga los modelos una sola vez (se puede llamar varias veces sin costo). */
+  function cargarModelos() {
+    if (listo) return Promise.resolve();
+    if (!cargando) {
+      cargando = Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODELOS),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODELOS),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODELOS)
+      ]).then(function () { listo = true; }, function (e) { cargando = null; throw e; });
+    }
+    return cargando;
+  }
+
+  function mensajeCamara(e) {
+    if (e.name === 'NotAllowedError') return 'Permite el uso de la cámara para esta página y vuelve a intentarlo.';
+    if (e.name === 'NotFoundError' || e.name === 'OverconstrainedError') return 'No se encontró una cámara en este equipo.';
+    if (e.name === 'NotReadableError') return 'Otra aplicación está usando la cámara. Ciérrala e intenta de nuevo.';
+    return 'No se pudo abrir la cámara.';
   }
 
   async function iniciar(videoEl) {
@@ -239,23 +452,16 @@ var Rostro = (function () {
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false
       });
     } catch (e) {
-      throw new Error(mensajeCamara(e));
+      throw { mensaje: mensajeCamara(e) };
     }
     video.srcObject = stream;
     await new Promise(function (r) { if (video.readyState >= 1) r(); else video.onloadedmetadata = r; });
     await video.play();
-    await cargarModelos();
-  }
-
-  function mensajeCamara(e) {
-    if (e.name === 'NotAllowedError') {
-      return /system/i.test(e.message)
-        ? 'El sistema operativo bloquea la cámara. En Windows: Configuración → Privacidad → Cámara → permitir a las apps de escritorio.'
-        : 'La cámara está bloqueada para esta página. Toca el ícono 🔒 o 📷 junto a la dirección, elige "Permitir" en Cámara y recarga.';
+    try {
+      await cargarModelos();
+    } catch (e) {
+      throw { mensaje: 'No se pudo cargar el reconocimiento facial. Revisa el internet.' };
     }
-    if (e.name === 'NotFoundError' || e.name === 'OverconstrainedError') return 'No se encontró una cámara en este equipo.';
-    if (e.name === 'NotReadableError') return 'Otra aplicación está usando la cámara (Zoom, Teams…). Ciérrala e intenta de nuevo.';
-    return 'No se pudo abrir la cámara: ' + e.message;
   }
 
   function detener() {
@@ -266,66 +472,112 @@ var Rostro = (function () {
 
   // ------------------------------------------------ Medidas de la cara (68 puntos)
   function d(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-  // Apertura del ojo (Eye Aspect Ratio): baja mucho al cerrar el ojo.
+  // Apertura del ojo (Eye Aspect Ratio): baja mucho con el ojo cerrado.
   function ear(o) { return (d(o[1], o[5]) + d(o[2], o[4])) / (2 * d(o[0], o[3])); }
   function medidas(lm) {
     var p = lm.positions;
     return {
       ear: (ear(p.slice(36, 42)) + ear(p.slice(42, 48))) / 2,
-      // Posición de la punta de la nariz entre los extremos de la mandíbula: ~0.5 de frente.
-      // Una foto plana inclinada mantiene esta proporción; una cabeza real que gira, no.
+      // Punta de la nariz entre los extremos de la mandíbula: cambia al girar una cabeza real;
+      // una foto plana inclinada conserva la proporción.
       giro: (p[30].x - p[0].x) / (p[16].x - p[0].x)
     };
   }
 
   async function leer() {
-    var r = await faceapi.detectAllFaces(video, opcRapida()).withFaceLandmarks();
-    if (r.length === 0) return { estado: 'Coloca tu cara frente a la cámara' };
-    if (r.length > 1) return { estado: 'Solo debe aparecer una persona' };
-    if (r[0].detection.box.width / video.videoWidth < 0.2) return { estado: 'Acércate un poco más' };
-    return { estado: 'ok', m: medidas(r[0].landmarks) };
+    var r = await faceapi.detectAllFaces(video, opcVida()).withFaceLandmarks();
+    if (r.length === 0) return { cara: false, motivo: 'Coloca tu rostro dentro del círculo' };
+    if (r.length > 1) return { cara: false, motivo: 'Solo una persona frente a la cámara' };
+    var lado = Math.min(video.videoWidth, video.videoHeight);
+    if (r[0].detection.box.width / lado < 0.22) return { cara: false, motivo: 'Acércate un poco más' };
+    return { cara: true, m: medidas(r[0].landmarks) };
   }
 
   function promedio(a) { return a.reduce(function (s, x) { return s + x; }, 0) / a.length; }
 
-  async function retoParpadeo(avisar) {
-    var texto = 'Parpadea despacio 👁️';
-    var base = [], cerrado = false, inicio = Date.now();
-    avisar(texto);
-    while (Date.now() - inicio < 15000) {
+  /** Reto 1: cerrar los ojos ~1 s y abrirlos. Se mide contra la apertura normal de cada persona. */
+  async function retoOjos(cb) {
+    var base = [], cerrados = false, inicio = Date.now();
+    var aviso = { texto: 'Cierra los ojos un momento', detalle: 'Luego vuelve a abrirlos', icono: 'ojo' };
+    while (Date.now() - inicio < TIEMPO_RETO_MS) {
       var l = await leer();
-      if (l.estado !== 'ok') { avisar(l.estado); continue; }
-      avisar(texto);
+      if (!l.cara) { cb({ texto: aviso.texto, detalle: l.motivo, icono: 'rostro', cara: false }); continue; }
       var e = l.m.ear;
-      if (!cerrado) {
-        if (base.length >= 3 && e < promedio(base) * 0.7) cerrado = true;
-        else { base.push(e); if (base.length > 8) base.shift(); }
-      } else if (e > promedio(base) * 0.85) {
+      if (base.length < 4) {
+        base.push(e);
+        cb({ texto: aviso.texto, detalle: aviso.detalle, icono: 'ojo', cara: true, progreso: 0.1 });
+        continue;
+      }
+      var b = promedio(base);
+      if (!cerrados) {
+        if (e < b * 0.75) {
+          cerrados = true;
+          cb({ texto: 'Ahora ábrelos', detalle: '', icono: 'ojo', cara: true, progreso: 0.6 });
+        } else {
+          base.push(e); base.shift(); // se adapta si al inicio los tenía entrecerrados
+          cb({ texto: aviso.texto, detalle: aviso.detalle, icono: 'ojo', cara: true, progreso: 0.2 });
+        }
+      } else if (e > b * 0.88) {
+        cb({ texto: 'Muy bien', detalle: '', icono: 'ojo', cara: true, progreso: 1 });
         return true;
       }
     }
     return false;
   }
 
-  async function retoGiro(avisar) {
-    var texto = 'Gira la cabeza hacia un lado y regresa al frente ↔️';
-    var girado = false, inicio = Date.now();
-    avisar(texto);
-    while (Date.now() - inicio < 15000) {
+  /** Reto 2: girar la cabeza hacia un lado y regresar. Se mide contra la posición inicial de la persona. */
+  async function retoGiro(cb) {
+    var base = [], girado = false, maxDesv = 0, inicio = Date.now();
+    var aviso = { texto: 'Gira lentamente la cabeza', detalle: 'Hacia un lado y regresa al centro', icono: 'giro' };
+    while (Date.now() - inicio < TIEMPO_RETO_MS) {
       var l = await leer();
-      if (l.estado !== 'ok') { avisar(l.estado); continue; }
-      avisar(girado ? 'Ahora regresa al frente' : texto);
-      var g = l.m.giro;
-      if (!girado && (g < 0.3 || g > 0.7)) girado = true;
-      else if (girado && g > 0.4 && g < 0.6) return true;
+      if (!l.cara) {
+        // De perfil el detector puede perder la cara: si ya venía girando, cuenta como giro.
+        if (!girado && base.length >= 3 && maxDesv > 0.06) {
+          girado = true;
+          cb({ texto: 'Ahora regresa al centro', detalle: '', icono: 'giro', cara: true, progreso: 0.6 });
+        } else {
+          cb({ texto: aviso.texto, detalle: l.motivo, icono: 'rostro', cara: false });
+        }
+        continue;
+      }
+      if (base.length < 3) {
+        base.push(l.m.giro);
+        cb({ texto: aviso.texto, detalle: aviso.detalle, icono: 'giro', cara: true, progreso: 0.05 });
+        continue;
+      }
+      var desv = Math.abs(l.m.giro - promedio(base));
+      maxDesv = Math.max(maxDesv, desv);
+      if (!girado) {
+        if (desv > 0.1) {
+          girado = true;
+          cb({ texto: 'Ahora regresa al centro', detalle: '', icono: 'giro', cara: true, progreso: 0.6 });
+        } else {
+          cb({ texto: aviso.texto, detalle: aviso.detalle, icono: 'giro', cara: true, progreso: 0.05 + Math.min(desv / 0.1, 1) * 0.5 });
+        }
+      } else if (desv < 0.05) {
+        cb({ texto: 'Muy bien', detalle: '', icono: 'giro', cara: true, progreso: 1 });
+        return true;
+      }
     }
     return false;
   }
 
-  async function pruebaVida(avisar) {
-    var retos = Math.random() < 0.5 ? [retoParpadeo, retoGiro] : [retoGiro, retoParpadeo];
+  /**
+   * Prueba de vida: los dos retos en orden aleatorio.
+   * cb recibe además paso (1 o 2) y progreso total de 0 a 1.
+   */
+  async function pruebaVida(cb) {
+    var retos = Math.random() < 0.5 ? [retoOjos, retoGiro] : [retoGiro, retoOjos];
     for (var i = 0; i < retos.length; i++) {
-      if (!(await retos[i](avisar))) return false;
+      var ok = await retos[i](function (e) {
+        e.paso = i + 1;
+        e.totalPasos = retos.length;
+        e.progresoTotal = (i + (e.progreso || 0)) / retos.length;
+        cb(e);
+      });
+      if (!ok) return false;
+      await esperar(350);
     }
     return true;
   }
@@ -338,20 +590,24 @@ var Rostro = (function () {
     var ctx = c.getContext('2d');
     ctx.translate(w, 0); ctx.scale(-1, 1); // igual a como la persona se ve en pantalla
     ctx.drawImage(video, 0, 0, w, h);
-    return c.toDataURL('image/jpeg', 0.7);
+    return c.toDataURL('image/jpeg', 0.72);
   }
 
-  async function capturar(n, avisar) {
-    avisar('No te muevas, tomando foto… 📸');
+  async function capturar(n, cb) {
     var descriptores = [], foto = null, inicio = Date.now();
+    cb({ texto: 'Mantente quieto', detalle: 'Mira directo a la cámara', icono: 'rostro', cara: true, progreso: 0 });
     while (descriptores.length < n && Date.now() - inicio < 15000) {
-      var r = await faceapi.detectAllFaces(video, opcPrecisa()).withFaceLandmarks().withFaceDescriptors();
-      if (r.length !== 1) { avisar(r.length ? 'Solo debe aparecer una persona' : 'No te muevas, mira a la cámara'); continue; }
+      var r = await faceapi.detectAllFaces(video, opcCaptura()).withFaceLandmarks().withFaceDescriptors();
+      if (r.length !== 1) {
+        cb({ texto: 'Mantente quieto', detalle: r.length ? 'Solo una persona frente a la cámara' : 'Mira directo a la cámara', icono: 'rostro', cara: false });
+        continue;
+      }
       if (!foto) foto = tomarFoto();
       descriptores.push(Array.from(r[0].descriptor, function (x) { return Math.round(x * 1e5) / 1e5; }));
-      await esperar(120);
+      cb({ texto: 'Mantente quieto', detalle: 'Mira directo a la cámara', icono: 'rostro', cara: true, progreso: descriptores.length / n });
+      await esperar(100);
     }
-    if (descriptores.length < n) throw new Error('No se pudo capturar el rostro. Mejora la luz e intenta de nuevo.');
+    if (descriptores.length < n) throw { mensaje: 'No pudimos ver bien tu rostro. Busca mejor luz e intenta de nuevo.' };
     return { descriptores: descriptores, foto: foto };
   }
 
@@ -360,7 +616,72 @@ var Rostro = (function () {
 
   </script>
   <script>
-    // ---------------------------------------------- Comunicación con el servidor
+    // ================================================================ Íconos (trazos estilo SF Symbols)
+    var ICONOS = {
+      reloj: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
+      candado: '<rect x="5" y="10.5" width="14" height="10" rx="2.6"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/><path d="M12 14.5v2"/>',
+      tienda: '<path d="M4.5 10.5V19a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-8.5"/><path d="M3.5 9.5 5.2 4.6A1 1 0 0 1 6.1 4h11.8a1 1 0 0 1 .9.6l1.7 4.9"/><path d="M3.5 9.5a2.8 2.8 0 0 0 5.6 0 2.9 2.9 0 0 0 5.8 0 2.8 2.8 0 0 0 5.6 0"/><path d="M10 20v-4.5h4V20"/>',
+      rostro: '<path d="M4 8.5V6.5A2.5 2.5 0 0 1 6.5 4h2M15.5 4h2A2.5 2.5 0 0 1 20 6.5v2M20 15.5v2a2.5 2.5 0 0 1-2.5 2.5h-2M8.5 20h-2A2.5 2.5 0 0 1 4 17.5v-2"/><path d="M9 9.5v1.2M15 9.5v1.2M12 9.5v3.7h-1"/><path d="M9.3 16a3.8 3.8 0 0 0 5.4 0"/>',
+      ojo: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+      giro: '<circle cx="12" cy="12" r="4.2"/><path d="M6.5 8.5 3 12l3.5 3.5M17.5 8.5 21 12l-3.5 3.5"/>',
+      entrada: '<path d="M3 19h18"/><path d="M6.5 15.5a5.5 5.5 0 0 1 11 0"/><path d="M12 4v3M4.9 7.4l1.6 1.6M19.1 7.4l-1.6 1.6"/><path d="M9.5 6 12 3.5 14.5 6"/>',
+      almuerzo: '<path d="M5 9h11v4.5A5.5 5.5 0 0 1 10.5 19h0A5.5 5.5 0 0 1 5 13.5V9z"/><path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5c-.6.8-.6 1.7 0 2.5M11 3.5c-.6.8-.6 1.7 0 2.5M14 3.5c-.6.8-.6 1.7 0 2.5"/><path d="M4 21h14"/>',
+      regreso: '<path d="M9.5 14.5 4.5 9.5l5-5"/><path d="M4.5 9.5h10a5 5 0 0 1 0 10H11"/>',
+      salida: '<path d="M10 4H6.5A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20H10"/><path d="m15 16 4-4-4-4M19 12H9"/>',
+      llegada: '<path d="M14 4h3.5A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5H14"/><path d="m10 16 4-4-4-4M14 12H4"/>',
+      borrar: '<path d="M9.2 5.5H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9.2a2 2 0 0 1-1.5-.7L3 12l4.7-5.8a2 2 0 0 1 1.5-.7z"/><path d="m11.5 9.5 5 5M16.5 9.5l-5 5"/>',
+      flecha: '<path d="m9.5 6 6 6-6 6"/>',
+      check: '<circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.7 2.7L16.2 9.5"/>',
+      error: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.2M12 16.2v.3"/>',
+      alerta: '<path d="M10.3 4.4 2.9 17.2a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.4a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 16.8v.2"/>',
+      sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+      escudo: '<path d="M12 3.5 5 6v5.5c0 4.2 3 7.6 7 9 4-1.4 7-4.8 7-9V6l-7-2.5z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
+      wifi: '<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0"/><path d="M12 19.5v.1"/>'
+    };
+    function icono(nombre) { return '<svg class="i" viewBox="0 0 24 24">' + (ICONOS[nombre] || '') + '</svg>'; }
+    document.querySelectorAll('svg[data-i]').forEach(function (s) { s.innerHTML = ICONOS[s.getAttribute('data-i')] || ''; });
+
+    // Cómo se presenta cada tipo de registro.
+    var TIPO = {
+      ENTRADA:         { icono: 'entrada',  titulo: 'Entrada',            detalle: 'Iniciar tu jornada',            listo: 'Entrada registrada' },
+      INICIO_ALMUERZO: { icono: 'almuerzo', titulo: 'Almuerzo',           detalle: 'Pausar para almorzar',          listo: 'Buen provecho' },
+      FIN_ALMUERZO:    { icono: 'regreso',  titulo: 'Terminar almuerzo',  detalle: 'Volver a tu jornada',           listo: 'Regreso registrado' },
+      SALIDA:          { icono: 'salida',   titulo: 'Salida',             detalle: 'Terminar tu jornada',           listo: 'Salida registrada' },
+      LLEGADA_VISITA:  { icono: 'llegada',  titulo: 'Llegada a tienda',   detalle: 'Registrar llegada a esta tienda', listo: 'Llegada registrada' },
+      SALIDA_VISITA:   { icono: 'salida',   titulo: 'Salida de tienda',   detalle: 'Registrar salida de esta tienda', listo: 'Salida registrada' }
+    };
+
+    // ================================================================ Utilidades
+    function $(id) { return document.getElementById(id); }
+    function esc(t) {
+      return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function vibrar(patron) { try { if (navigator.vibrate) navigator.vibrate(patron); } catch (e) { /* sin vibración */ } }
+    function esperarMs(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    function inicial(nombre) { return String(nombre || '?').trim().charAt(0).toUpperCase(); }
+
+    var _avisoTimer;
+    function aviso(mensaje, tipo) {
+      tipo = tipo || 'info';
+      $('avisoIcono').innerHTML = ICONOS[tipo === 'ok' ? 'check' : tipo === 'error' ? 'error' : 'alerta'];
+      $('avisoTexto').textContent = mensaje;
+      $('aviso').className = 'aviso ' + tipo + ' visible';
+      clearTimeout(_avisoTimer);
+      _avisoTimer = setTimeout(function () { $('aviso').className = 'aviso ' + tipo; }, tipo === 'error' ? 5000 : 3200);
+    }
+
+    function crearSpinner(el) {
+      var h = '';
+      for (var i = 0; i < 12; i++) h += '<span style="transform:rotate(' + (i * 30) + 'deg);animation-delay:' + (-1 + i / 12).toFixed(3) + 's"></span>';
+      el.innerHTML = h;
+    }
+    crearSpinner($('esperaSpinner'));
+    function mostrarEspera(texto) { $('esperaTexto').textContent = texto; $('espera').classList.add('visible'); }
+    function ocultarEspera() { $('espera').classList.remove('visible'); }
+
+    // ================================================================ Servidor
     async function llamar(accion, datos) {
       var ctrl = new AbortController();
       var limite = setTimeout(function () { ctrl.abort(); }, 45000);
@@ -381,28 +702,98 @@ var Rostro = (function () {
       return r;
     }
 
-    function $(id) { return document.getElementById(id); }
-    function esc(t) {
-      return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    // ================================================================ Teclado numérico (reutilizable)
+    function Teclado(idTeclado, idPuntos, largo, alCompletar) {
+      var valor = '', bloqueado = false;
+      var tecl = $(idTeclado), pts = $(idPuntos);
+      var teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'borrar'];
+      tecl.innerHTML = teclas.map(function (t) {
+        if (!t) return '<span class="tecla vacia"></span>';
+        if (t === 'borrar') return '<button class="tecla accion" data-t="borrar" aria-label="Borrar">' + icono('borrar') + '</button>';
+        return '<button class="tecla" data-t="' + t + '">' + t + '</button>';
+      }).join('');
+      // pointerdown responde al instante (sin el retraso del "click" en pantallas táctiles).
+      tecl.addEventListener('pointerdown', function (ev) {
+        var b = ev.target.closest('[data-t]');
+        if (!b || bloqueado) return;
+        ev.preventDefault();
+        var t = b.getAttribute('data-t');
+        b.classList.add('presionada');
+        setTimeout(function () { b.classList.remove('presionada'); }, 140);
+        vibrar(8);
+        if (t === 'borrar') valor = valor.slice(0, -1);
+        else if (valor.length < largo) valor += t;
+        pintar();
+        if (valor.length === largo) {
+          bloqueado = true;
+          var v = valor;
+          setTimeout(function () { alCompletar(v); }, 160);
+        }
       });
-    }
-    var _avisoTimer;
-    function aviso(mensaje, tipo) {
-      var el = $('aviso');
-      el.textContent = mensaje;
-      el.className = 'aviso ' + (tipo || 'info') + ' visible';
-      clearTimeout(_avisoTimer);
-      _avisoTimer = setTimeout(function () { el.className = 'aviso'; }, tipo === 'error' ? 6000 : 3500);
+      function pintar() {
+        var h = '';
+        for (var i = 0; i < largo; i++) h += '<span class="' + (i < valor.length ? 'lleno' : '') + '"></span>';
+        pts.innerHTML = h;
+      }
+      pintar();
+      return {
+        limpiar: function () { valor = ''; bloqueado = false; pts.className = 'puntos'; pintar(); },
+        error: function () {
+          vibrar([30, 60, 30]);
+          pts.className = 'puntos error sacudir';
+          setTimeout(function () { valor = ''; bloqueado = false; pts.className = 'puntos'; pintar(); }, 650);
+        }
+      };
     }
 
-    // ---------------------------------------------- Estado
-    var CLAVE_TOKEN = 'asistencia_kiosco_token';
-    var LARGO_CODIGO = 4;
-    var estado = {
-      token: null, tienda: null, desfaseMs: 0, codigo: '', ticket: null, persona: null, acciones: [],
-      registro: null, gps: null, timer: null, ocupado: false, intento: 0
+    // ================================================================ Anillo del escáner (estilo Face ID)
+    var MARCAS = 72;
+    (function () {
+      var h = '';
+      for (var i = 0; i < MARCAS; i++) {
+        var a = (i / MARCAS) * Math.PI * 2 - Math.PI / 2;
+        var r1 = 90, r2 = 98;
+        h += '<line x1="' + (100 + r1 * Math.cos(a)).toFixed(2) + '" y1="' + (100 + r1 * Math.sin(a)).toFixed(2) +
+          '" x2="' + (100 + r2 * Math.cos(a)).toFixed(2) + '" y2="' + (100 + r2 * Math.sin(a)).toFixed(2) +
+          '" style="animation-delay:' + (i / MARCAS * 1.1).toFixed(3) + 's"/>';
+      }
+      $('anillo').innerHTML = h;
+    })();
+    var lineasAnillo = Array.prototype.slice.call($('anillo').querySelectorAll('line'));
+
+    var Escaner = {
+      estado: function (nombre) { $('escaner').className = 'escaner ' + (nombre || ''); },
+      progreso: function (p) {
+        var n = Math.round(Math.max(0, Math.min(1, p)) * MARCAS);
+        lineasAnillo.forEach(function (l, i) { l.classList.toggle('on', i < n); });
+      },
+      guia: function (texto, detalle, glifo) {
+        if ($('guiaTexto').textContent !== texto) {
+          $('guiaTexto').textContent = texto;
+          $('guia').classList.remove('cambio'); void $('guia').offsetWidth; $('guia').classList.add('cambio');
+        }
+        $('guiaDetalle').textContent = detalle || '';
+        var g = glifo || '';
+        if ($('glifo').getAttribute('data-g') !== g) {
+          $('glifo').setAttribute('data-g', g);
+          $('glifo').className = 'glifo ' + g;
+          $('glifo').style.visibility = g ? 'visible' : 'hidden';
+          $('glifo').innerHTML = g === 'cargando' ? '<div class="spinner" style="width:22px;height:22px"></div>' : (g ? icono(g) : '');
+          if (g === 'cargando') crearSpinner($('glifo').firstChild);
+        }
+      },
+      pasos: function (actual, total) {
+        var spans = $('pasos').children;
+        for (var i = 0; i < spans.length; i++) {
+          spans[i].style.display = i < total ? '' : 'none';
+          spans[i].className = i < actual - 1 ? 'hecho' : i === actual - 1 ? 'activo' : '';
+        }
+      }
     };
+
+    // ================================================================ Estado general
+    var CLAVE_TOKEN = 'asistencia_kiosco_token';
+    var estado = { token: null, tienda: null, desfaseMs: 0, ticket: null, persona: null, acciones: [], registro: null, gps: null, timer: null, intento: 0, consentimiento: false };
 
     function leerToken() { try { return localStorage.getItem(CLAVE_TOKEN); } catch (e) { return null; } }
     function guardarToken(t) { try { localStorage.setItem(CLAVE_TOKEN, t); } catch (e) { /* sin almacenamiento */ } }
@@ -412,57 +803,66 @@ var Rostro = (function () {
       document.querySelectorAll('.pantalla').forEach(function (p) { p.classList.remove('visible'); });
       $(id).classList.add('visible');
     }
-
-    function programarRegreso(ms) {
-      clearTimeout(estado.timer);
-      estado.timer = setTimeout(reiniciar, ms);
-    }
+    function programarRegreso(ms) { clearTimeout(estado.timer); estado.timer = setTimeout(reiniciar, ms); }
 
     function reiniciar() {
       clearTimeout(estado.timer);
+      ocultarEspera();
       Rostro.detener();
       estado.intento++; // invalida cualquier captura en curso
-      estado.codigo = ''; estado.ticket = null; estado.persona = null; estado.registro = null; estado.ocupado = false;
-      pintarPuntos();
+      estado.ticket = null; estado.persona = null; estado.registro = null;
+      tecladoCodigo.limpiar(); tecladoActivar.limpiar(); tecladoRegistro.limpiar();
+      $('indicacion').textContent = 'Ingresa tu código';
+      $('indicacion').className = 'indicacion';
       mostrar(estado.token ? 'sInicio' : 'sActivar');
     }
 
-    // ---------------------------------------------- Reloj (hora del servidor)
+    // ================================================================ Reloj con la hora del servidor
+    function ahoraServidor() { return new Date(Date.now() + estado.desfaseMs); }
     function tic() {
-      var ahora = new Date(Date.now() + estado.desfaseMs);
-      $('reloj').textContent = ahora.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Guatemala' });
-      var f = ahora.toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Guatemala' });
+      var a = ahoraServidor();
+      $('reloj').textContent = a.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Guatemala' });
+      var f = a.toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Guatemala' });
       $('fecha').textContent = f.charAt(0).toUpperCase() + f.slice(1);
     }
+    function saludo() {
+      var h = Number(ahoraServidor().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Guatemala' }));
+      return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+    }
 
-    // ---------------------------------------------- GPS continuo
+    // ================================================================ GPS continuo
+    function pintarGps(clase, texto) { $('gpsPunto').className = 'punto ' + clase; $('gpsTexto').textContent = texto; }
     function iniciarGps() {
-      if (!navigator.geolocation) { $('gpsEstado').textContent = '📍 Sin GPS'; return; }
+      if (!navigator.geolocation) return pintarGps('mal', 'Sin ubicación');
       navigator.geolocation.watchPosition(function (p) {
         var c = p.coords;
         // Se conserva la lectura más precisa de los últimos 60 s.
         if (!estado.gps || Date.now() - estado.gps.t > 60000 || c.accuracy <= estado.gps.precision) {
           estado.gps = { lat: c.latitude, lng: c.longitude, precision: c.accuracy, t: Date.now() };
         }
-        $('gpsEstado').textContent = '📍 ±' + Math.round(c.accuracy) + ' m';
+        pintarGps(c.accuracy <= 100 ? 'ok' : 'buscando', c.accuracy <= 100 ? 'Ubicación lista' : 'Señal débil');
       }, function () {
-        $('gpsEstado').textContent = '📍 Sin ubicación';
+        pintarGps('mal', 'Permite la ubicación');
       }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
     }
-
     async function obtenerGps() {
       var inicio = Date.now();
       while (Date.now() - inicio < 15000) {
         if (estado.gps && Date.now() - estado.gps.t < 120000) return estado.gps;
-        await new Promise(function (r) { setTimeout(r, 500); });
+        await esperarMs(400);
       }
-      throw { mensaje: 'No se pudo obtener la ubicación del equipo. Permite la ubicación para esta página.' };
+      throw { mensaje: 'No pudimos obtener la ubicación del equipo. Permite la ubicación para esta página.' };
     }
 
-    // ---------------------------------------------- Arranque
+    // ================================================================ Arranque
+    var tecladoCodigo = Teclado('teclado', 'puntos', 4, identificar);
+    var tecladoActivar = Teclado('actTeclado', 'actPuntos', 6, activar);
+    var tecladoRegistro = Teclado('regTeclado', 'regPuntos', 6, validarRegistro);
+
     async function arrancar() {
       if (API_URL.indexOf('https://script.google.com/') !== 0) {
-        $('cargandoTexto').textContent = 'Falta configurar la dirección de la API (API_URL).';
+        $('cargandoTexto').textContent = 'Falta configurar la dirección de la API.';
+        $('cargaBarra').style.visibility = 'hidden';
         return;
       }
       estado.token = leerToken();
@@ -473,186 +873,267 @@ var Rostro = (function () {
         else { borrarToken(); estado.token = null; }
         setInterval(tic, 1000); tic();
         iniciarGps();
-        Rostro.precargar().catch(function () { /* se reintenta al usar la cámara */ });
+        Rostro.precargar().catch(function () { /* se reintenta al abrir la cámara */ });
         reiniciar();
       } catch (e) {
-        $('sCargando').innerHTML = '<div class="icono-resultado">⚠️</div><p>' + esc(e.mensaje || 'Error') + '</p>' +
-          '<button onclick="location.reload()">Reintentar</button>';
+        $('cargaBarra').style.visibility = 'hidden';
+        $('cargandoTexto').textContent = e.mensaje || 'No se pudo conectar.';
+        $('btnReintentar').style.display = '';
       }
     }
+    function ponerTienda(t) { estado.tienda = t; $('nomTienda').textContent = t.nombre; }
 
-    function ponerTienda(t) {
-      estado.tienda = t;
-      $('nomTienda').textContent = t.nombre;
-    }
-
-    // ---------------------------------------------- Activación
-    async function activar() {
-      var codigo = $('actCodigo').value.trim();
-      if (!/^\d{6}$/.test(codigo)) return aviso('El código debe tener 6 dígitos', 'error');
-      $('btnActivar').disabled = true;
-      $('actEstado').textContent = 'Verificando ubicación…';
+    // ================================================================ Activación del equipo
+    async function activar(codigo) {
+      mostrarEspera('Verificando ubicación');
       try {
         var g = await obtenerGps();
-        $('actEstado').textContent = 'Activando…';
+        $('esperaTexto').textContent = 'Activando equipo';
         var r = await llamar('activar', { codigo: codigo, lat: g.lat, lng: g.lng });
         guardarToken(r.datos.token);
         estado.token = r.datos.token;
         ponerTienda(r.datos.tienda);
-        $('actCodigo').value = '';
+        ocultarEspera();
+        vibrar([15, 40, 15]);
         aviso('Equipo activado para ' + r.datos.tienda.nombre, 'ok');
         reiniciar();
       } catch (e) {
-        aviso(e.mensaje || 'Error', 'error');
+        ocultarEspera();
+        tecladoActivar.error();
+        aviso(e.mensaje || 'No se pudo activar', 'error');
       }
-      $('actEstado').textContent = '';
-      $('btnActivar').disabled = false;
     }
 
-    // ---------------------------------------------- Código personal
-    function pintarPuntos() {
-      var h = '';
-      for (var i = 0; i < LARGO_CODIGO; i++) h += '<span class="' + (i < estado.codigo.length ? 'lleno' : '') + '"></span>';
-      $('puntos').innerHTML = h;
-    }
-    function tecla(d) {
-      if (estado.codigo.length < LARGO_CODIGO) { estado.codigo += d; pintarPuntos(); }
-      if (estado.codigo.length === LARGO_CODIGO) identificar();
-    }
-    function borrar() { estado.codigo = estado.codigo.slice(0, -1); pintarPuntos(); }
-
-    async function identificar() {
-      if (estado.ocupado || estado.codigo.length !== LARGO_CODIGO) return;
-      estado.ocupado = true;
-      $('btnOk').disabled = true;
-      var codigo = estado.codigo;
-      estado.codigo = ''; pintarPuntos();
+    // ================================================================ Código personal
+    async function identificar(codigo) {
+      mostrarEspera('Verificando');
       try {
         var r = await llamar('identificar', { token: estado.token, codigo: codigo });
+        ocultarEspera();
         estado.ticket = r.datos.ticket;
         estado.persona = r.datos;
         var acciones = r.datos.acciones;
         if (!acciones.length) {
-          resultado(false, 'Ya registraste tu salida de hoy', '¡Hasta mañana, ' + r.datos.nombre + '!');
-        } else if (acciones.length === 1) {
-          marcar(acciones[0]); // el sistema decide: un solo paso posible
-        } else {
-          estado.acciones = acciones;
-          $('saludo').textContent = 'Hola, ' + r.datos.nombre + ' 👋';
-          $('botonesAccion').innerHTML = acciones.map(function (a, i) {
-            return '<button class="grande" onclick="marcar(estado.acciones[' + i + '])">' + esc(a.texto) + '</button>';
-          }).join('');
-          mostrar('sAcciones');
-          programarRegreso(30000);
+          return resultado(false, 'Jornada terminada', 'Ya registraste tu salida de hoy. Hasta mañana, ' + r.datos.nombre + '.');
         }
+        if (acciones.length === 1) return marcar(acciones[0]); // el sistema decide: un solo paso posible
+        estado.acciones = acciones;
+        $('avatar').textContent = inicial(r.datos.nombre);
+        $('saludo').textContent = saludo() + ', ' + r.datos.nombre;
+        $('botonesAccion').innerHTML = acciones.map(function (a, i) {
+          var t = TIPO[a.tipo] || { icono: 'reloj', titulo: a.texto, detalle: '' };
+          return '<button class="accion" style="animation-delay:' + (0.08 + i * 0.07) + 's" onclick="marcar(estado.acciones[' + i + '])">' +
+            '<span class="ico">' + icono(t.icono) + '</span><span><b>' + esc(t.titulo) + '</b><small>' + esc(t.detalle) + '</small></span>' +
+            '<span class="flecha">' + icono('flecha') + '</span></button>';
+        }).join('');
+        mostrar('sAcciones');
+        programarRegreso(30000);
       } catch (e) {
-        manejarError(e);
+        ocultarEspera();
+        if (e.resultado === 'CODIGO_INVALIDO') {
+          tecladoCodigo.error();
+          $('indicacion').textContent = 'Código incorrecto';
+          $('indicacion').className = 'indicacion mal';
+          setTimeout(function () { $('indicacion').textContent = 'Ingresa tu código'; $('indicacion').className = 'indicacion'; }, 2200);
+        } else {
+          manejarError(e);
+        }
       }
-      $('btnOk').disabled = false;
-      estado.ocupado = false;
     }
 
-    // ---------------------------------------------- Cámara (común a marcaje y registro)
-    function instr(t) { $('instruccion').textContent = t; }
-
-    /** Enciende la cámara, hace la prueba de vida y captura n descriptores. Cancela si se reinicia. */
-    async function capturarRostro(titulo, n) {
+    // ================================================================ Escáner: cámara + prueba de vida + captura
+    /**
+     * Abre la cámara, hace la prueba de vida (con un reintento automático) y captura n descriptores.
+     * Devuelve { cap, vigente }. Si la persona cancela, lanza { cancelado: true }.
+     */
+    async function escanear(titulo, n) {
       clearTimeout(estado.timer);
       var miIntento = estado.intento;
       function vigente() { if (miIntento !== estado.intento) throw { cancelado: true }; }
       $('camTitulo').textContent = titulo;
+      $('congelada').removeAttribute('src');
+      Escaner.estado('buscando'); Escaner.progreso(0); Escaner.pasos(1, 3);
+      Escaner.guia('Preparando cámara', 'Un momento', 'cargando');
       mostrar('sCamara');
-      instr('Encendiendo cámara…');
-      programarRegreso(90000); // nadie se queda atorado en la cámara
+      programarRegreso(120000); // nadie se queda atorado en la cámara
       try {
         await Rostro.iniciar($('video'));
         vigente();
-        var vivo = await Rostro.pruebaVida(instr);
+        var vivo = false;
+        for (var intento = 1; intento <= 2 && !vivo; intento++) {
+          vivo = await Rostro.pruebaVida(function (e) {
+            if (miIntento !== estado.intento) return;
+            Escaner.estado(e.cara ? '' : 'buscando');
+            Escaner.progreso(e.progresoTotal * 0.8);
+            Escaner.pasos(e.paso, 3);
+            Escaner.guia(e.texto, e.detalle, e.cara ? e.icono : 'rostro');
+          });
+          vigente();
+          if (!vivo && intento === 1) {
+            vibrar([30, 60, 30]);
+            Escaner.estado('buscando'); Escaner.progreso(0);
+            Escaner.guia('Intentémoslo otra vez', 'Hazlo con calma, sin prisa', 'rostro');
+            await esperarMs(1800);
+            vigente();
+          }
+        }
+        if (!vivo) throw { mensaje: 'No pudimos confirmar el movimiento. Busca buena luz y vuelve a intentarlo.' };
+        Escaner.pasos(3, 3);
+        var cap = await Rostro.capturar(n, function (e) {
+          if (miIntento !== estado.intento) return;
+          Escaner.estado(e.cara ? '' : 'buscando');
+          Escaner.progreso(0.8 + (e.progreso || 0) * 0.2);
+          Escaner.guia(e.texto, e.detalle, 'rostro');
+        });
         vigente();
-        if (!vivo) throw { mensaje: 'No se completó la prueba de vida. Intenta de nuevo.' };
-        var cap = await Rostro.capturar(n, instr);
-        vigente();
-        instr('Enviando…');
+        // Se congela la imagen y el anillo pasa a "procesando" mientras responde el servidor.
+        $('congelada').src = cap.foto;
+        Escaner.estado('final procesando'); Escaner.progreso(1);
+        Escaner.guia('Verificando identidad', 'Esto toma unos segundos', 'cargando');
         return { cap: cap, vigente: vigente };
       } finally {
         Rostro.detener();
       }
     }
 
-    // ---------------------------------------------- Marcaje
+    /** Animación de éxito en el escáner antes de pasar al resultado. */
+    async function exitoEscaner(texto) {
+      Escaner.estado('final exito');
+      Escaner.guia(texto, '', '');
+      vibrar([15, 40, 15]);
+      await esperarMs(1100);
+    }
+
+    // ================================================================ Marcaje
     async function marcar(accion) {
+      var t = TIPO[accion.tipo] || { titulo: accion.texto, listo: accion.texto + ' registrada' };
       try {
-        var c = await capturarRostro(accion.texto + ' · ' + estado.persona.nombre, 3);
+        var esc_ = await escanear(t.titulo, 3);
         var g = await obtenerGps();
-        var r = await llamar('marcar', {
-          token: estado.token, ticket: estado.ticket, tipo: accion.tipo, descriptores: c.cap.descriptores,
-          foto: c.cap.foto, vida: true, lat: g.lat, lng: g.lng, precision: g.precision
-        });
-        c.vigente();
-        resultado(true, r.datos.texto + ' registrada', r.datos.nombre + ' · ' + r.datos.hora, c.cap.foto);
+        var lento = setTimeout(function () { Escaner.guia('Guardando registro', 'Casi listo', 'cargando'); }, 3500);
+        var r;
+        try {
+          r = await llamar('marcar', {
+            token: estado.token, ticket: estado.ticket, tipo: accion.tipo, descriptores: esc_.cap.descriptores,
+            foto: esc_.cap.foto, vida: true, lat: g.lat, lng: g.lng, precision: g.precision
+          });
+        } finally { clearTimeout(lento); }
+        esc_.vigente();
+        await exitoEscaner('Identidad confirmada');
+        esc_.vigente();
+        resultado(true, t.listo, null, r.datos.hora, r.datos.nombre, esc_.cap.foto);
       } catch (e) {
         if (!e.cancelado) manejarError(e);
       }
     }
 
-    // ---------------------------------------------- Registro de rostro
+    // ================================================================ Registro de rostro
     function abrirRegistro() {
-      $('regCodigo').value = '';
+      tecladoRegistro.limpiar();
       mostrar('sRegCodigo');
       programarRegreso(120000);
     }
 
-    async function validarRegistro() {
-      var codigo = $('regCodigo').value.trim();
-      if (!/^\d{6}$/.test(codigo)) return aviso('El código debe tener 6 dígitos', 'error');
-      $('btnRegCodigo').disabled = true;
+    async function validarRegistro(codigo) {
+      mostrarEspera('Verificando código');
       try {
         var r = await llamar('validarRegistro', { token: estado.token, codigo: codigo });
+        ocultarEspera();
         estado.registro = r.datos;
+        estado.consentimiento = false;
+        $('regAcepto').className = 'interruptor';
+        $('btnComenzar').disabled = true;
+        $('regAvatar').textContent = inicial(r.datos.nombre);
         $('regNombre').textContent = r.datos.nombre;
-        $('regAcepto').checked = false;
         mostrar('sRegConsentimiento');
-        programarRegreso(120000);
+        programarRegreso(180000);
       } catch (e) {
-        manejarError(e);
+        ocultarEspera();
+        tecladoRegistro.error();
+        aviso(e.mensaje || 'Código incorrecto', 'error');
       }
-      $('btnRegCodigo').disabled = false;
+    }
+
+    function alternarConsentimiento() {
+      estado.consentimiento = !estado.consentimiento;
+      $('regAcepto').className = 'interruptor' + (estado.consentimiento ? ' on' : '');
+      $('btnComenzar').disabled = !estado.consentimiento;
+      vibrar(8);
     }
 
     async function iniciarRegistro() {
-      if (!$('regAcepto').checked) return aviso('Primero marca la casilla de autorización', 'alerta');
+      if (!estado.consentimiento) return;
       try {
-        var c = await capturarRostro('Registro · ' + estado.registro.nombre, 5);
+        var esc_ = await escanear('Registro de rostro', 5);
+        Escaner.guia('Guardando tu rostro', 'Esto toma unos segundos', 'cargando');
         var r = await llamar('enrolar', {
-          token: estado.token, ticket: estado.registro.ticket, descriptores: c.cap.descriptores,
-          foto: c.cap.foto, vida: true, consentimiento: true
+          token: estado.token, ticket: estado.registro.ticket, descriptores: esc_.cap.descriptores,
+          foto: esc_.cap.foto, vida: true, consentimiento: true
         });
-        c.vigente();
-        resultado(true, 'Rostro registrado', 'Listo, ' + r.datos.nombre + '. Ya puedes marcar con tu código.', c.cap.foto);
+        esc_.vigente();
+        await exitoEscaner('Rostro guardado');
+        esc_.vigente();
+        resultado(true, 'Rostro registrado', 'Ya puedes registrar tu asistencia con tu código.', null, r.datos.nombre, esc_.cap.foto);
       } catch (e) {
         if (!e.cancelado) manejarError(e);
       }
     }
 
-    // ---------------------------------------------- Resultado y errores
-    function resultado(ok, titulo, detalle, foto) {
-      $('resIcono').textContent = ok ? '✅' : '❌';
+    // ================================================================ Resultado y errores
+    function resultado(ok, titulo, detalle, hora, nombre, foto) {
+      ocultarEspera();
+      $('resIcono').setAttribute('class', 'resultado-icono ' + (ok ? 'ok' : 'mal'));
+      $('resTrazo').setAttribute('d', ok ? 'M33 53l13 13 25-27' : 'M38 38l28 28M66 38L38 66');
+      // Reinicia las animaciones de trazo.
+      var ic = $('resIcono'); var copia = ic.cloneNode(true); ic.parentNode.replaceChild(copia, ic);
       $('resTitulo').textContent = titulo;
-      $('resTitulo').style.color = ok ? 'var(--ok)' : 'var(--error)';
+      $('resHora').textContent = hora || '';
+      $('resHora').style.display = hora ? '' : 'none';
       $('resDetalle').textContent = detalle || '';
+      $('resDetalle').style.display = detalle ? '' : 'none';
+      $('resPersona').style.display = nombre ? '' : 'none';
+      $('resNombre').textContent = nombre || '';
       $('resFoto').style.display = foto ? '' : 'none';
       if (foto) $('resFoto').src = foto;
+      $('resBoton').textContent = ok ? 'Listo' : 'Intentar de nuevo';
+      var ms = ok ? 4500 : 7000;
+      var barra = $('resRegreso');
+      barra.style.animation = 'none'; void barra.offsetWidth;
+      barra.style.animation = 'vaciar ' + ms + 'ms linear forwards';
       mostrar('sResultado');
-      programarRegreso(ok ? 4000 : 6000);
+      programarRegreso(ms);
     }
 
-    function manejarError(e) {
+    var TITULOS_ERROR = {
+      ROSTRO_NO_COINCIDE: 'No te reconocimos',
+      FUERA_DE_RANGO: 'Fuera de la tienda',
+      BLOQUEADO: 'Acceso bloqueado',
+      OTRA_TIENDA: 'Tienda equivocada',
+      SIN_ROSTRO: 'Falta registrar tu rostro',
+      ROSTRO_DUPLICADO: 'Rostro ya registrado',
+      ROSTRO_INCONSISTENTE: 'Intenta de nuevo',
+      TICKET_VENCIDO: 'Se acabó el tiempo',
+      YA_REGISTRADO: 'Ya estaba registrado',
+      ERROR_RED: 'Sin conexión',
+      DEMASIADOS_INTENTOS: 'Espera un momento'
+    };
+
+    async function manejarError(e) {
       if (e.resultado === 'DISPOSITIVO_NO_AUTORIZADO' || e.resultado === 'TIENDA_INACTIVA') {
         borrarToken(); estado.token = null;
         aviso('Este equipo ya no está activado. Pide un código al administrador.', 'error');
         return reiniciar();
       }
-      resultado(false, 'No se pudo completar', e.mensaje || e.message || 'Error');
+      if ($('sCamara').classList.contains('visible')) {
+        // El anillo se pone rojo y tiembla un instante antes de explicar el error.
+        var miIntento = estado.intento;
+        Escaner.estado(($('congelada').src ? 'final ' : '') + 'error');
+        Escaner.guia(TITULOS_ERROR[e.resultado] || 'No se pudo completar', '', '');
+        vibrar([30, 60, 30]);
+        await esperarMs(900);
+        if (miIntento !== estado.intento) return;
+      }
+      resultado(false, TITULOS_ERROR[e.resultado] || 'No se pudo completar', e.mensaje || e.message || 'Intenta de nuevo.');
     }
 
     arrancar();
