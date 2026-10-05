@@ -59,8 +59,8 @@
       padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
       overflow-y: auto;
     }
-    .pantalla.visible { display: flex; animation: entrar .5s var(--curva) both; }
-    @keyframes entrar { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+    .pantalla.visible { display: flex; animation: entrar .6s cubic-bezier(.25, .8, .25, 1) both; }
+    @keyframes entrar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
     .columna { width: 100%; max-width: 440px; display: flex; flex-direction: column; align-items: center; flex: 1; }
     .espacio { flex: 1; min-height: 12px; }
 
@@ -190,11 +190,21 @@
     .escaner svg.anillo { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
     .anillo line { stroke: rgba(255,255,255,.22); stroke-width: 2.6; stroke-linecap: round; transition: stroke .25s; }
     .anillo line.on { stroke: #fff; }
-    .escaner.buscando .anillo { animation: respirar 1.8s ease-in-out infinite; }
-    @keyframes respirar { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-    .escaner.procesando .anillo line { stroke: rgba(255,255,255,.18); animation: cometa 1.1s linear infinite; }
-    @keyframes cometa { 0% { stroke: #fff; } 35%, 100% { stroke: rgba(255,255,255,.18); } }
+    .escaner .anillo { will-change: opacity; transition: opacity .4s; }
+    .escaner.buscando .anillo { animation: respirar 2s ease-in-out infinite; }
+    @keyframes respirar { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+    .barrido {
+      position: absolute; inset: 0; opacity: 0; transition: opacity .4s; will-change: transform;
+      -webkit-mask: conic-gradient(from 0deg, transparent 0deg, transparent 220deg, #000 360deg);
+      mask: conic-gradient(from 0deg, transparent 0deg, transparent 220deg, #000 360deg);
+    }
+    .barrido svg { width: 100%; height: 100%; overflow: visible; }
+    .barrido line { stroke: #fff; stroke-width: 2.6; stroke-linecap: round; }
+    .escaner.procesando .anillo { opacity: .35; }
+    .escaner.procesando .barrido { opacity: 1; animation: rotar 1.2s linear infinite; }
+    @keyframes rotar { to { transform: rotate(360deg); } }
     .escaner.exito .anillo line { stroke: var(--ok); }
+    .escaner.exito .anillo, .escaner.error .anillo { opacity: 1; }
     .escaner.error .anillo line { stroke: var(--error); }
     .escaner.error { animation: sacudir .5s cubic-bezier(.36, .07, .19, .97); }
 
@@ -232,6 +242,7 @@
     .persona { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 10px 18px 10px 10px; border-radius: 999px; background: var(--superficie); box-shadow: var(--sombra); animation: subir .6s .3s var(--curva) both; }
     .persona img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
     .persona span { font-weight: 600; font-size: 17px; }
+    .tecnico { color: var(--texto-3); font-size: 12px; margin: 4px 0 0; font-family: ui-monospace, Menlo, Consolas, monospace; }
     .regreso { width: 120px; height: 4px; border-radius: 4px; background: var(--linea); overflow: hidden; margin: 22px 0 6px; }
     .regreso i { display: block; height: 100%; background: var(--texto-3); transform-origin: left; animation: vaciar linear forwards; }
     @keyframes vaciar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
@@ -252,7 +263,7 @@
     /* ================================================================ Capa de espera y avisos */
     .espera {
       position: fixed; inset: 0; display: grid; place-items: center; z-index: 30; opacity: 0; pointer-events: none;
-      background: rgba(245, 245, 247, .55); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); transition: opacity .25s;
+      background: rgba(245, 245, 247, .6); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: opacity .3s;
     }
     @media (prefers-color-scheme: dark) { .espera { background: rgba(0,0,0,.5); } }
     .espera.visible { opacity: 1; pointer-events: auto; }
@@ -368,6 +379,7 @@
         <video id="video"></video>
         <img class="congelada" id="congelada" alt="">
         <svg class="anillo" id="anillo" viewBox="0 0 200 200"></svg>
+        <div class="barrido"><svg id="barrido" viewBox="0 0 200 200"></svg></div>
         <div class="sello"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="25"/><path d="M15 27l7 7 15-16"/></svg></div>
       </div>
       <div class="guia" id="guia">
@@ -386,6 +398,7 @@
       <h1 class="titulo" id="resTitulo"></h1>
       <div class="hora-grande" id="resHora"></div>
       <p class="subtitulo" id="resDetalle"></p>
+      <p class="tecnico" id="resTecnico"></p>
       <div class="persona" id="resPersona"><img id="resFoto" alt=""><span id="resNombre"></span></div>
       <div class="espacio"></div>
       <div class="regreso"><i id="resRegreso"></i></div>
@@ -407,31 +420,54 @@
   <script>
     /**
  * Módulo de rostro del kiosco. Usa @vladmandic/face-api (cargado desde jsDelivr).
+ *   Rostro.precargar()                      // modelos + "calentamiento" en segundo plano
  *   await Rostro.iniciar(videoEl)
- *   const vivo = await Rostro.pruebaVida(cb)        // cerrar ojos + girar cabeza, orden aleatorio
- *   const { descriptores, foto } = await Rostro.capturar(n, cb)
+ *   const { descriptores, foto } = await Rostro.verificar(n, cb)
  *   Rostro.detener()
- * cb recibe { texto, detalle, icono, cara, progreso } para pintar la interfaz.
+ *
+ * Verificación en 4 fases, pensada para ser fácil:
+ *   1. Alinear: rostro dentro del círculo unos instantes.
+ *   2. Girar: la cabeza hacia cualquier lado (prueba de vida: una foto plana no cambia sus proporciones).
+ *   3. Regresar: mirar de nuevo al frente.
+ *   4. Captura: n lecturas del rostro de frente.
+ * cb recibe { fase, texto, detalle, icono, cara, progreso (0 a 1 del total) }.
  * Solo calcula descriptores; la comparación de identidad se hace en el servidor.
  */
 var Rostro = (function () {
   var MODELOS = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model/';
-  var video = null, stream = null, listo = false, cargando = null;
-  var TIEMPO_RETO_MS = 20000;
+  var video = null, stream = null, listo = false, cargando = null, sesion = 0;
+  var TIEMPO_MAX_MS = 25000;
+  // Medido con fotos reales: un giro natural de ~25° mueve la proporción más de 0.15;
+  // una foto plana inclinada o aplastada casi siempre menos de 0.12.
+  var GIRO_MIN = 0.14;      // cuánto debe moverse la nariz respecto a la mandíbula
+  var FRENTE_MAX = 0.07;    // tolerancia para considerar "de frente" otra vez
 
   function esperar(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  function opcVida() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }); }
-  function opcCaptura() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }); }
+  /** Deja que el navegador pinte antes de seguir (animaciones fluidas mientras se analiza). */
+  function respirar() { return new Promise(function (r) { requestAnimationFrame(function () { setTimeout(r, 0); }); }); }
+  function opcRapida() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }); }
+  function opcCaptura() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.45 }); }
 
-  /** Carga los modelos una sola vez (se puede llamar varias veces sin costo). */
-  function cargarModelos() {
+  /**
+   * Carga los modelos una sola vez y los "calienta": la primera detección prepara el procesador
+   * gráfico y congela la pantalla 1-3 s. Así ocurre al abrir la app y no frente a la persona.
+   */
+  function precargar() {
     if (listo) return Promise.resolve();
     if (!cargando) {
       cargando = Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODELOS),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODELOS),
         faceapi.nets.faceRecognitionNet.loadFromUri(MODELOS)
-      ]).then(function () { listo = true; }, function (e) { cargando = null; throw e; });
+      ]).then(async function () {
+        var c = document.createElement('canvas');
+        c.width = 320; c.height = 240;
+        c.getContext('2d').fillRect(0, 0, 320, 240);
+        await faceapi.detectAllFaces(c, opcRapida()).withFaceLandmarks();
+        await faceapi.detectAllFaces(c, opcCaptura());
+        await faceapi.computeFaceDescriptor(c);
+        listo = true;
+      }).catch(function (e) { cargando = null; throw e; });
     }
     return cargando;
   }
@@ -444,6 +480,7 @@ var Rostro = (function () {
   }
 
   async function iniciar(videoEl) {
+    sesion++;
     video = videoEl;
     video.setAttribute('playsinline', '');
     video.muted = true;
@@ -452,137 +489,47 @@ var Rostro = (function () {
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false
       });
     } catch (e) {
-      throw { mensaje: mensajeCamara(e) };
+      throw { mensaje: mensajeCamara(e), tecnico: 'CAM-' + e.name };
     }
     video.srcObject = stream;
-    await new Promise(function (r) { if (video.readyState >= 1) r(); else video.onloadedmetadata = r; });
+    await new Promise(function (r) { if (video.readyState >= 2) r(); else video.onloadeddata = r; });
     await video.play();
     try {
-      await cargarModelos();
+      await precargar();
     } catch (e) {
-      throw { mensaje: 'No se pudo cargar el reconocimiento facial. Revisa el internet.' };
+      throw { mensaje: 'No se pudo cargar el reconocimiento facial. Revisa el internet.', tecnico: 'MOD' };
     }
   }
 
+  /** Apaga la cámara y cancela cualquier análisis en curso (no queda nada corriendo en segundo plano). */
   function detener() {
+    sesion++;
     if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
     stream = null;
     if (video) video.srcObject = null;
   }
 
-  // ------------------------------------------------ Medidas de la cara (68 puntos)
-  function d(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-  // Apertura del ojo (Eye Aspect Ratio): baja mucho con el ojo cerrado.
-  function ear(o) { return (d(o[1], o[5]) + d(o[2], o[4])) / (2 * d(o[0], o[3])); }
-  function medidas(lm) {
+  // ------------------------------------------------ Lectura de un cuadro
+  function proporcionGiro(lm) {
     var p = lm.positions;
-    return {
-      ear: (ear(p.slice(36, 42)) + ear(p.slice(42, 48))) / 2,
-      // Punta de la nariz entre los extremos de la mandíbula: cambia al girar una cabeza real;
-      // una foto plana inclinada conserva la proporción.
-      giro: (p[30].x - p[0].x) / (p[16].x - p[0].x)
-    };
+    return (p[30].x - p[0].x) / (p[16].x - p[0].x); // ~0.5 de frente
   }
 
-  async function leer() {
-    var r = await faceapi.detectAllFaces(video, opcVida()).withFaceLandmarks();
+  async function leer(diag) {
+    var t0 = performance.now();
+    var r = await faceapi.detectAllFaces(video, opcRapida()).withFaceLandmarks();
+    diag.cuadros++; diag.ms += performance.now() - t0;
     if (r.length === 0) return { cara: false, motivo: 'Coloca tu rostro dentro del círculo' };
     if (r.length > 1) return { cara: false, motivo: 'Solo una persona frente a la cámara' };
+    diag.conCara++;
+    var box = r[0].detection.box;
     var lado = Math.min(video.videoWidth, video.videoHeight);
-    if (r[0].detection.box.width / lado < 0.22) return { cara: false, motivo: 'Acércate un poco más' };
-    return { cara: true, m: medidas(r[0].landmarks) };
+    if (box.width / lado < 0.2) return { cara: false, motivo: 'Acércate un poco más' };
+    return { cara: true, giro: proporcionGiro(r[0].landmarks) };
   }
 
   function promedio(a) { return a.reduce(function (s, x) { return s + x; }, 0) / a.length; }
 
-  /** Reto 1: cerrar los ojos ~1 s y abrirlos. Se mide contra la apertura normal de cada persona. */
-  async function retoOjos(cb) {
-    var base = [], cerrados = false, inicio = Date.now();
-    var aviso = { texto: 'Cierra los ojos un momento', detalle: 'Luego vuelve a abrirlos', icono: 'ojo' };
-    while (Date.now() - inicio < TIEMPO_RETO_MS) {
-      var l = await leer();
-      if (!l.cara) { cb({ texto: aviso.texto, detalle: l.motivo, icono: 'rostro', cara: false }); continue; }
-      var e = l.m.ear;
-      if (base.length < 4) {
-        base.push(e);
-        cb({ texto: aviso.texto, detalle: aviso.detalle, icono: 'ojo', cara: true, progreso: 0.1 });
-        continue;
-      }
-      var b = promedio(base);
-      if (!cerrados) {
-        if (e < b * 0.75) {
-          cerrados = true;
-          cb({ texto: 'Ahora ábrelos', detalle: '', icono: 'ojo', cara: true, progreso: 0.6 });
-        } else {
-          base.push(e); base.shift(); // se adapta si al inicio los tenía entrecerrados
-          cb({ texto: aviso.texto, detalle: aviso.detalle, icono: 'ojo', cara: true, progreso: 0.2 });
-        }
-      } else if (e > b * 0.88) {
-        cb({ texto: 'Muy bien', detalle: '', icono: 'ojo', cara: true, progreso: 1 });
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /** Reto 2: girar la cabeza hacia un lado y regresar. Se mide contra la posición inicial de la persona. */
-  async function retoGiro(cb) {
-    var base = [], girado = false, maxDesv = 0, inicio = Date.now();
-    var aviso = { texto: 'Gira lentamente la cabeza', detalle: 'Hacia un lado y regresa al centro', icono: 'giro' };
-    while (Date.now() - inicio < TIEMPO_RETO_MS) {
-      var l = await leer();
-      if (!l.cara) {
-        // De perfil el detector puede perder la cara: si ya venía girando, cuenta como giro.
-        if (!girado && base.length >= 3 && maxDesv > 0.06) {
-          girado = true;
-          cb({ texto: 'Ahora regresa al centro', detalle: '', icono: 'giro', cara: true, progreso: 0.6 });
-        } else {
-          cb({ texto: aviso.texto, detalle: l.motivo, icono: 'rostro', cara: false });
-        }
-        continue;
-      }
-      if (base.length < 3) {
-        base.push(l.m.giro);
-        cb({ texto: aviso.texto, detalle: aviso.detalle, icono: 'giro', cara: true, progreso: 0.05 });
-        continue;
-      }
-      var desv = Math.abs(l.m.giro - promedio(base));
-      maxDesv = Math.max(maxDesv, desv);
-      if (!girado) {
-        if (desv > 0.1) {
-          girado = true;
-          cb({ texto: 'Ahora regresa al centro', detalle: '', icono: 'giro', cara: true, progreso: 0.6 });
-        } else {
-          cb({ texto: aviso.texto, detalle: aviso.detalle, icono: 'giro', cara: true, progreso: 0.05 + Math.min(desv / 0.1, 1) * 0.5 });
-        }
-      } else if (desv < 0.05) {
-        cb({ texto: 'Muy bien', detalle: '', icono: 'giro', cara: true, progreso: 1 });
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Prueba de vida: los dos retos en orden aleatorio.
-   * cb recibe además paso (1 o 2) y progreso total de 0 a 1.
-   */
-  async function pruebaVida(cb) {
-    var retos = Math.random() < 0.5 ? [retoOjos, retoGiro] : [retoGiro, retoOjos];
-    for (var i = 0; i < retos.length; i++) {
-      var ok = await retos[i](function (e) {
-        e.paso = i + 1;
-        e.totalPasos = retos.length;
-        e.progresoTotal = (i + (e.progreso || 0)) / retos.length;
-        cb(e);
-      });
-      if (!ok) return false;
-      await esperar(350);
-    }
-    return true;
-  }
-
-  // ------------------------------------------------ Captura
   function tomarFoto() {
     var w = 480, h = Math.round(video.videoHeight * w / video.videoWidth);
     var c = document.createElement('canvas');
@@ -593,25 +540,85 @@ var Rostro = (function () {
     return c.toDataURL('image/jpeg', 0.72);
   }
 
-  async function capturar(n, cb) {
-    var descriptores = [], foto = null, inicio = Date.now();
-    cb({ texto: 'Mantente quieto', detalle: 'Mira directo a la cámara', icono: 'rostro', cara: true, progreso: 0 });
-    while (descriptores.length < n && Date.now() - inicio < 15000) {
+  /** Código corto para soporte: cuadros analizados / con rostro / giro máximo / ms por cuadro. */
+  function codigoTecnico(diag, fase) {
+    return fase + ' ' + diag.cuadros + '/' + diag.conCara + ' g' + Math.round(diag.maxGiro * 100) +
+      ' ' + Math.round(diag.ms / Math.max(1, diag.cuadros)) + 'ms';
+  }
+
+  // ------------------------------------------------ Verificación completa
+  async function verificar(n, cb) {
+    var miSesion = sesion;
+    function seguir() { if (miSesion !== sesion || !stream) throw { cancelado: true }; }
+    var diag = { cuadros: 0, conCara: 0, maxGiro: 0, ms: 0 };
+    var inicio = Date.now();
+    var fase = 'alinear', base = [], baseGiro = 0;
+
+    function tiempo() { return Date.now() - inicio < TIEMPO_MAX_MS; }
+
+    // Fases 1 a 3: alinear, girar y regresar.
+    while (fase !== 'captura') {
+      if (!tiempo()) {
+        var msj = fase === 'alinear' ? 'No logramos ver tu rostro. Acércate y busca buena luz de frente.'
+          : fase === 'girar' ? 'No detectamos el giro. Gira la cabeza un poco más, despacio.'
+            : 'No detectamos que volvieras al frente.';
+        throw { mensaje: msj, tecnico: codigoTecnico(diag, fase.toUpperCase()) };
+      }
+      seguir();
+      var l = await leer(diag);
+      await respirar();
+      seguir();
+
+      if (fase === 'alinear') {
+        if (!l.cara) { base = []; cb({ fase: 1, texto: 'Mira a la cámara', detalle: l.motivo, icono: 'rostro', cara: false, progreso: 0 }); continue; }
+        base.push(l.giro);
+        cb({ fase: 1, texto: 'Mira a la cámara', detalle: 'Mantén tu rostro dentro del círculo', icono: 'rostro', cara: true, progreso: 0.25 * base.length / 3 });
+        if (base.length >= 3) { baseGiro = promedio(base); fase = 'girar'; await esperar(250); }
+        continue;
+      }
+
+      if (fase === 'girar') {
+        if (!l.cara) {
+          // De perfil el detector puede perder el rostro: si ya venía girando, cuenta como giro.
+          if (diag.maxGiro > GIRO_MIN * 0.65) fase = 'regresar';
+          else cb({ fase: 2, texto: 'Gira la cabeza hacia un lado', detalle: l.motivo, icono: 'rostro', cara: false, progreso: 0.25 });
+          continue;
+        }
+        var desv = Math.abs(l.giro - baseGiro);
+        diag.maxGiro = Math.max(diag.maxGiro, desv);
+        if (desv >= GIRO_MIN) fase = 'regresar';
+        else cb({ fase: 2, texto: 'Gira la cabeza hacia un lado', detalle: 'Despacio, como mirando sobre tu hombro', icono: 'giro', cara: true, progreso: 0.25 + 0.35 * Math.min(desv / GIRO_MIN, 1) });
+        continue;
+      }
+
+      // fase === 'regresar'
+      cb({ fase: 2, texto: 'Ahora mira al frente', detalle: '', icono: 'rostro', cara: true, progreso: 0.65 });
+      if (l.cara && Math.abs(l.giro - baseGiro) <= FRENTE_MAX) fase = 'captura';
+    }
+
+    // Fase 4: captura de frente.
+    var descriptores = [], foto = null, finCaptura = Date.now() + 12000;
+    cb({ fase: 3, texto: 'Perfecto, no te muevas', detalle: '', icono: 'rostro', cara: true, progreso: 0.7 });
+    while (descriptores.length < n && Date.now() < finCaptura) {
+      seguir();
       var r = await faceapi.detectAllFaces(video, opcCaptura()).withFaceLandmarks().withFaceDescriptors();
+      await respirar();
+      seguir();
       if (r.length !== 1) {
-        cb({ texto: 'Mantente quieto', detalle: r.length ? 'Solo una persona frente a la cámara' : 'Mira directo a la cámara', icono: 'rostro', cara: false });
+        cb({ fase: 3, texto: 'Perfecto, no te muevas', detalle: 'Mira directo a la cámara', icono: 'rostro', cara: false, progreso: 0.7 + 0.3 * descriptores.length / n });
         continue;
       }
       if (!foto) foto = tomarFoto();
       descriptores.push(Array.from(r[0].descriptor, function (x) { return Math.round(x * 1e5) / 1e5; }));
-      cb({ texto: 'Mantente quieto', detalle: 'Mira directo a la cámara', icono: 'rostro', cara: true, progreso: descriptores.length / n });
-      await esperar(100);
+      cb({ fase: 3, texto: 'Perfecto, no te muevas', detalle: '', icono: 'rostro', cara: true, progreso: 0.7 + 0.3 * descriptores.length / n });
     }
-    if (descriptores.length < n) throw { mensaje: 'No pudimos ver bien tu rostro. Busca mejor luz e intenta de nuevo.' };
+    if (descriptores.length < n) {
+      throw { mensaje: 'No pudimos ver bien tu rostro. Busca mejor luz e intenta de nuevo.', tecnico: codigoTecnico(diag, 'CAPTURA') };
+    }
     return { descriptores: descriptores, foto: foto };
   }
 
-  return { precargar: cargarModelos, iniciar: iniciar, detener: detener, pruebaVida: pruebaVida, capturar: capturar };
+  return { precargar: precargar, iniciar: iniciar, detener: detener, verificar: verificar };
 })();
 
   </script>
@@ -758,6 +765,7 @@ var Rostro = (function () {
           '" style="animation-delay:' + (i / MARCAS * 1.1).toFixed(3) + 's"/>';
       }
       $('anillo').innerHTML = h;
+      $('barrido').innerHTML = h;
     })();
     var lineasAnillo = Array.prototype.slice.call($('anillo').querySelectorAll('line'));
 
@@ -873,8 +881,9 @@ var Rostro = (function () {
         else { borrarToken(); estado.token = null; }
         setInterval(tic, 1000); tic();
         iniciarGps();
-        Rostro.precargar().catch(function () { /* se reintenta al abrir la cámara */ });
         reiniciar();
+        // Se carga y "calienta" el reconocimiento facial cuando la pantalla ya está visible.
+        setTimeout(function () { Rostro.precargar().catch(function () { /* se reintenta al abrir la cámara */ }); }, 900);
       } catch (e) {
         $('cargaBarra').style.visibility = 'hidden';
         $('cargandoTexto').textContent = e.mensaje || 'No se pudo conectar.';
@@ -959,32 +968,29 @@ var Rostro = (function () {
       try {
         await Rostro.iniciar($('video'));
         vigente();
-        var vivo = false;
-        for (var intento = 1; intento <= 2 && !vivo; intento++) {
-          vivo = await Rostro.pruebaVida(function (e) {
-            if (miIntento !== estado.intento) return;
-            Escaner.estado(e.cara ? '' : 'buscando');
-            Escaner.progreso(e.progresoTotal * 0.8);
-            Escaner.pasos(e.paso, 3);
-            Escaner.guia(e.texto, e.detalle, e.cara ? e.icono : 'rostro');
-          });
-          vigente();
-          if (!vivo && intento === 1) {
-            vibrar([30, 60, 30]);
-            Escaner.estado('buscando'); Escaner.progreso(0);
-            Escaner.guia('Intentémoslo otra vez', 'Hazlo con calma, sin prisa', 'rostro');
-            await esperarMs(1800);
+        var cap = null, ultimoError = null;
+        for (var intento = 1; intento <= 2 && !cap; intento++) {
+          try {
+            cap = await Rostro.verificar(n, function (e) {
+              if (miIntento !== estado.intento) return;
+              Escaner.estado(e.cara ? '' : 'buscando');
+              Escaner.progreso(e.progreso);
+              Escaner.pasos(e.fase, 3);
+              Escaner.guia(e.texto, e.detalle, e.cara ? e.icono : 'rostro');
+            });
+          } catch (err) {
             vigente();
+            ultimoError = err;
+            if (intento === 1) {
+              vibrar([30, 60, 30]);
+              Escaner.estado('buscando'); Escaner.progreso(0); Escaner.pasos(1, 3);
+              Escaner.guia('Intentémoslo otra vez', 'Con calma, sin prisa', 'rostro');
+              await esperarMs(2200);
+              vigente();
+            }
           }
         }
-        if (!vivo) throw { mensaje: 'No pudimos confirmar el movimiento. Busca buena luz y vuelve a intentarlo.' };
-        Escaner.pasos(3, 3);
-        var cap = await Rostro.capturar(n, function (e) {
-          if (miIntento !== estado.intento) return;
-          Escaner.estado(e.cara ? '' : 'buscando');
-          Escaner.progreso(0.8 + (e.progreso || 0) * 0.2);
-          Escaner.guia(e.texto, e.detalle, 'rostro');
-        });
+        if (!cap) throw ultimoError;
         vigente();
         // Se congela la imagen y el anillo pasa a "procesando" mientras responde el servidor.
         $('congelada').src = cap.foto;
@@ -1001,7 +1007,7 @@ var Rostro = (function () {
       Escaner.estado('final exito');
       Escaner.guia(texto, '', '');
       vibrar([15, 40, 15]);
-      await esperarMs(1100);
+      await esperarMs(1500);
     }
 
     // ================================================================ Marcaje
@@ -1080,7 +1086,7 @@ var Rostro = (function () {
     }
 
     // ================================================================ Resultado y errores
-    function resultado(ok, titulo, detalle, hora, nombre, foto) {
+    function resultado(ok, titulo, detalle, hora, nombre, foto, tecnico) {
       ocultarEspera();
       $('resIcono').setAttribute('class', 'resultado-icono ' + (ok ? 'ok' : 'mal'));
       $('resTrazo').setAttribute('d', ok ? 'M33 53l13 13 25-27' : 'M38 38l28 28M66 38L38 66');
@@ -1091,12 +1097,13 @@ var Rostro = (function () {
       $('resHora').style.display = hora ? '' : 'none';
       $('resDetalle').textContent = detalle || '';
       $('resDetalle').style.display = detalle ? '' : 'none';
+      $('resTecnico').textContent = tecnico ? 'Código: ' + tecnico : '';
       $('resPersona').style.display = nombre ? '' : 'none';
       $('resNombre').textContent = nombre || '';
       $('resFoto').style.display = foto ? '' : 'none';
       if (foto) $('resFoto').src = foto;
       $('resBoton').textContent = ok ? 'Listo' : 'Intentar de nuevo';
-      var ms = ok ? 4500 : 7000;
+      var ms = ok ? 6000 : 9000;
       var barra = $('resRegreso');
       barra.style.animation = 'none'; void barra.offsetWidth;
       barra.style.animation = 'vaciar ' + ms + 'ms linear forwards';
@@ -1118,6 +1125,10 @@ var Rostro = (function () {
       DEMASIADOS_INTENTOS: 'Espera un momento'
     };
 
+    function tituloError(e) {
+      return TITULOS_ERROR[e.resultado] || (e.tecnico ? 'No pudimos verificarte' : 'No se pudo completar');
+    }
+
     async function manejarError(e) {
       if (e.resultado === 'DISPOSITIVO_NO_AUTORIZADO' || e.resultado === 'TIENDA_INACTIVA') {
         borrarToken(); estado.token = null;
@@ -1128,12 +1139,13 @@ var Rostro = (function () {
         // El anillo se pone rojo y tiembla un instante antes de explicar el error.
         var miIntento = estado.intento;
         Escaner.estado(($('congelada').src ? 'final ' : '') + 'error');
-        Escaner.guia(TITULOS_ERROR[e.resultado] || 'No se pudo completar', '', '');
+        Escaner.guia(tituloError(e), '', '');
         vibrar([30, 60, 30]);
-        await esperarMs(900);
+        await esperarMs(1500);
         if (miIntento !== estado.intento) return;
       }
-      resultado(false, TITULOS_ERROR[e.resultado] || 'No se pudo completar', e.mensaje || e.message || 'Intenta de nuevo.');
+      resultado(false, tituloError(e),
+        e.mensaje || e.message || 'Intenta de nuevo.', null, null, null, e.tecnico || e.resultado);
     }
 
     arrancar();
