@@ -44,11 +44,12 @@
       }
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; }
+    /* Kiosco: sin zoom con dos dedos ni con doble toque (Safari ignora maximum-scale=1). Se refuerza en JS. */
+    html, body { height: 100%; touch-action: pan-y; }
     body {
       margin: 0; background: var(--fondo); color: var(--texto); font-family: var(--fuente);
       -webkit-font-smoothing: antialiased; user-select: none; -webkit-user-select: none; overflow: hidden;
-      font-feature-settings: 'tnum' 0;
+      -webkit-touch-callout: none; font-feature-settings: 'tnum' 0;
     }
     button { font-family: inherit; border: 0; cursor: pointer; color: inherit; background: none; }
     svg.i { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
@@ -57,10 +58,19 @@
     .pantalla {
       position: fixed; inset: 0; display: none; flex-direction: column; align-items: center;
       padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
-      overflow-x: hidden; overflow-y: auto;
+      overflow-x: hidden; overflow-y: auto; background: var(--fondo); touch-action: pan-y;
     }
-    .pantalla.visible { display: flex; animation: entrar .6s cubic-bezier(.25, .8, .25, 1) both; }
-    @keyframes entrar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    /*
+     * Cambio de pantalla: cada pantalla tiene fondo propio (opaco) y la nueva aparece ENCIMA de la anterior,
+     * que se queda quieta debajo hasta que la nueva la cubre. Antes la anterior desaparecía de golpe y por
+     * un instante se veía el fondo o una pantalla intermedia (el destello claro → oscuro al abrir la cámara).
+     * Solo se animan opacidad y transform: Safari los anima aparte aunque el JavaScript esté ocupado.
+     */
+    .pantalla.visible { display: flex; z-index: 2; animation: pantallaEntra .4s var(--curva) both; }
+    .pantalla.visible > * { animation: contenidoEntra .5s var(--curva) both; }
+    .pantalla.saliendo { display: flex; z-index: 1; pointer-events: none; }
+    @keyframes pantallaEntra { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes contenidoEntra { from { transform: translateY(8px); } to { transform: none; } }
     .columna { width: 100%; max-width: 440px; display: flex; flex-direction: column; align-items: center; flex: 1; }
     .espacio { flex: 1; min-height: 12px; }
 
@@ -86,7 +96,9 @@
     .boton-enlace svg.i { width: 20px; height: 20px; }
 
     /* ================================================================ Indicador de carga (estilo iOS) */
-    .spinner { width: 28px; height: 28px; display: block; will-change: transform; animation: ruedita 1.2s steps(8) infinite; }
+    /* Giro continuo (linear): Safari lo anima aparte del JavaScript. Con steps(8) lo animaba el hilo principal
+       y la ruedita se quedaba congelada cada vez que algo pesado corría (se veía en "Verificando"). */
+    .spinner { width: 28px; height: 28px; display: block; will-change: transform; animation: ruedita .9s linear infinite; }
     .spinner svg { width: 100%; height: 100%; display: block; }
     .spinner line { stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
     @keyframes ruedita { to { transform: rotate(360deg); } }
@@ -181,46 +193,43 @@
 
     /* ================================================================ Escáner (estilo Face ID) */
     #sCamara { background: #000; color: #fff; }
+    /*
+     * Resultado que viene de la cámara: se queda en oscuro (como Apple Pay o Face ID). Antes la cámara negra
+     * pasaba de golpe a un resultado claro justo en el "✓ registrado" (un fogonazo de luz). La vuelta al
+     * inicio claro ocurre después, con calma, cuando la persona ya vio su resultado.
+     */
+    .pantalla.oscuro {
+      --fondo: #000000; --superficie: #1C1C1E; --superficie-2: #2C2C2E;
+      --texto: #F5F5F7; --texto-2: #98989D; --texto-3: #636366; --linea: rgba(255,255,255,.10);
+      --acento: #3B95F0; --acento-2: #64AEFF; --acento-suave: rgba(59, 149, 240, .16);
+      --sombra: 0 0 0 1px rgba(255,255,255,.06); --sombra-alta: 0 0 0 1px rgba(255,255,255,.08), 0 20px 50px rgba(0,0,0,.6);
+      color: var(--texto);
+    }
     #sCamara .titulo { font-size: 22px; margin-top: 2vh; color: rgba(255,255,255,.95); }
     .pasos { display: flex; gap: 6px; margin-top: 4px; height: 6px; }
     .pasos span { width: 22px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.22); transition: background .3s, width .3s var(--curva); }
     .pasos span.activo { width: 34px; background: #fff; }
     .pasos span.hecho { background: var(--ok); }
 
-    .escaner { position: relative; width: min(82vw, 360px); aspect-ratio: 1; margin-top: 4vh; flex: none; border-radius: 50%; overflow: hidden; }
-    /* El círculo recorta lo que gira: al rotar, las esquinas del cuadro ya no empujan la página. */
+    .escaner { position: relative; width: min(82vw, 360px); aspect-ratio: 1; margin-top: 4vh; flex: none; }
     .escaner video, .escaner .congelada {
       position: absolute; inset: 11%; width: 78%; height: 78%; border-radius: 50%; object-fit: cover;
       transform: scaleX(-1); background: #111;
     }
-    .escaner .congelada { display: none; transform: none; }
-    .escaner.final .congelada { display: block; }
-    .escaner svg.anillo { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-    .anillo line { stroke: rgba(255,255,255,.22); stroke-width: 2.6; stroke-linecap: round; transition: stroke .35s ease-out; }
-    .anillo line.on { stroke: #fff; }
-    .escaner .anillo { will-change: opacity; transition: opacity .4s; }
-    .escaner.buscando .anillo { animation: respirar 2s ease-in-out infinite; }
-    @keyframes respirar { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
-    .barrido {
-      position: absolute; inset: 0; opacity: 0; transition: opacity .4s; will-change: transform;
-      -webkit-mask: conic-gradient(from 0deg, transparent 0deg, transparent 220deg, #000 360deg);
-      mask: conic-gradient(from 0deg, transparent 0deg, transparent 220deg, #000 360deg);
-    }
-    .barrido svg { width: 100%; height: 100%; overflow: visible; will-change: transform; }
-    .barrido line { stroke: #fff; stroke-width: 2.6; stroke-linecap: round; }
-    .escaner.procesando .anillo { opacity: .35; }
+    /* La cámara se muestra solo cuando su imagen ya es estable (iOS cambia tamaño/orientación al abrirla:
+       antes se veía la cara muy cerca, luego con franjas negras y luego normal). */
+    .escaner video { opacity: 0; transition: opacity .35s var(--curva); }
+    .escaner video.lista { opacity: 1; }
+    /* Imagen congelada: el último cuadro del video copiado a un lienzo (al instante, sin decodificar JPEG). */
+    .escaner .congelada { transform: none; visibility: hidden; }
+    .escaner.final .congelada { visibility: visible; }
     /*
-     * "Verificando": gira la máscara de brillo, pero las marcas de adentro giran al revés a la misma
-     * velocidad, así que quedan QUIETAS justo encima de las del anillo. Antes giraban las marcas y,
-     * al pasar sobre las fijas, se veía un efecto estroboscopio (parpadeo).
+     * Anillo estilo Face ID dibujado en UN lienzo (canvas) a 60 cuadros/s. Antes eran dos capas SVG girando
+     * en sentidos opuestos con una máscara cónica: Safari no las mantenía sincronizadas y el barrido de
+     * "Verificando" saltaba de lugar en cada cuadro (parpadeo) y las marcas se veían dobles.
      */
-    .escaner.procesando .barrido { opacity: 1; animation: rotar 2.4s linear infinite; }
-    .escaner.procesando .barrido svg { animation: rotarInverso 2.4s linear infinite; }
+    .escaner .anillo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
     @keyframes rotar { to { transform: rotate(360deg); } }
-    @keyframes rotarInverso { to { transform: rotate(-360deg); } }
-    .escaner.exito .anillo line { stroke: var(--ok); }
-    .escaner.exito .anillo, .escaner.error .anillo { opacity: 1; }
-    .escaner.error .anillo line { stroke: var(--error); }
     .escaner.error { animation: sacudir .5s cubic-bezier(.36, .07, .19, .97); }
 
     .sello {
@@ -250,10 +259,6 @@
     @keyframes empujeD { 0%, 100% { transform: translateX(-2px); } 50% { transform: translateX(3px); } }
     @keyframes empujeA { 0%, 100% { transform: translateY(2px); } 50% { transform: translateY(-3px); } }
     @keyframes empujeB { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(3px); } }
-    /* Marcas del anillo hacia donde hay que mirar: azul que respira suavemente */
-    .anillo line.objetivo { stroke: var(--acento-2); animation: objetivo 1.6s ease-in-out infinite; }
-    .anillo line.objetivo.on { stroke: #fff; animation: none; }
-    @keyframes objetivo { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
     .guia h2 { font-family: var(--fuente-titulo); font-size: 24px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
     .guia p { color: rgba(255,255,255,.6); font-size: 16px; margin: 6px 0 0; min-height: 22px; }
     .cambio { animation: fundido .35s var(--curva); }
@@ -292,9 +297,10 @@
     /* ================================================================ Capa de espera y avisos */
     .espera {
       position: fixed; inset: 0; display: grid; place-items: center; z-index: 30; opacity: 0; pointer-events: none;
-      background: rgba(245, 245, 247, .6); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: opacity .3s;
+      /* Sin desenfoque (backdrop-filter): a pantalla completa es muy costoso en el teléfono y trababa la espera. */
+      background: rgba(245, 245, 247, .82); transition: opacity .3s;
     }
-    @media (prefers-color-scheme: dark) { .espera { background: rgba(0,0,0,.5); } }
+    @media (prefers-color-scheme: dark) { .espera { background: rgba(0,0,0,.66); } }
     .espera.visible { opacity: 1; pointer-events: auto; }
     .espera .caja { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 30px; border-radius: 22px; background: var(--superficie); box-shadow: var(--sombra-alta); color: var(--texto-2); font-size: 15px; font-weight: 500; }
 
@@ -408,10 +414,9 @@
       <p class="cam-sub" id="camSub"></p>
       <div class="pasos" id="pasos"><span></span><span></span><span></span></div>
       <div class="escaner buscando" id="escaner">
-        <video id="video"></video>
-        <img class="congelada" id="congelada" alt="">
-        <svg class="anillo" id="anillo" viewBox="0 0 200 200"></svg>
-        <div class="barrido"><svg id="barrido" viewBox="0 0 200 200"></svg></div>
+        <video id="video" playsinline muted></video>
+        <canvas class="congelada" id="congelada"></canvas>
+        <canvas class="anillo" id="anillo"></canvas>
         <div class="sello"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="25"/><path d="M15 27l7 7 15-16"/></svg></div>
       </div>
       <div class="guia" id="guia">
@@ -482,6 +487,7 @@ var Rostro = (function () {
 
   var video = null, stream = null, sesion = 0;
   var marcador = null, cargaMP = null, cargaFA = null, listoFA = false, motor = 'pendiente';
+  var calentadoConCamara = false, ultimoTsMP = 0;
 
   // ---- Parámetros calibrados con el simulador 3D (malla real de la cara girada con perspectiva)
   //   Cabeza real:  10° → dirección 0.135, 3D 0.019 · 15° → 0.20, 0.028 · arriba/abajo 10° → 0.09–0.10, 0.019
@@ -529,6 +535,13 @@ var Rostro = (function () {
       requestAnimationFrame(listo);
       setTimeout(listo, 50);
     });
+  }
+  /** Marca de tiempo para MediaPipe: siempre creciente entre TODAS las llamadas (si no, MediaPipe falla). */
+  function tsMP() {
+    var t = performance.now();
+    if (t <= ultimoTsMP) t = ultimoTsMP + 1;
+    ultimoTsMP = t;
+    return t;
   }
   function opcCaptura() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.45 }); }
   function opcRapida() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }); }
@@ -618,10 +631,18 @@ var Rostro = (function () {
         faceapi.nets.faceLandmark68Net.loadFromUri(MODELOS_FA),
         faceapi.nets.faceRecognitionNet.loadFromUri(MODELOS_FA)
       ]).then(async function () {
-        var c = lienzoVacio();
-        await faceapi.detectAllFaces(c, opcCaptura()).withFaceLandmarks();
-        await faceapi.detectAllFaces(c, opcRapida()).withFaceLandmarks();
-        await faceapi.computeFaceDescriptor(c);
+        // Se calienta con los tamaños reales de la cámara (vertical y horizontal): el procesador gráfico prepara
+        // programas distintos para cada tamaño, y prepararlos frente a la persona traba la pantalla.
+        var tamanos = [[480, 640], [640, 480], [320, 240]];
+        for (var i = 0; i < tamanos.length; i++) {
+          var c = lienzoVacio(tamanos[i][0], tamanos[i][1]);
+          await faceapi.detectAllFaces(c, opcCaptura()).withFaceLandmarks();
+        }
+        var chico = lienzoVacio();
+        await faceapi.detectAllFaces(chico, opcRapida()).withFaceLandmarks();
+        // En un lienzo vacío no hay caras, así que la red de puntos no corre sola: se calienta directo.
+        try { await faceapi.nets.faceLandmark68Net.detectLandmarks(lienzoVacio(112, 112)); } catch (e) { /* opcional */ }
+        await faceapi.computeFaceDescriptor(lienzoVacio(150, 150));
         listoFA = true;
       }).catch(function (e) { cargaFA = null; throw e; });
     }
@@ -647,9 +668,8 @@ var Rostro = (function () {
         }
         // La primera detección prepara el procesador gráfico (varios segundos): se hace aquí, no frente
         // a la persona, y con los tamaños reales de la cámara para que no se vuelva a preparar al abrirla.
-        var t = performance.now();
-        [[640, 480], [480, 640], [320, 240]].forEach(function (tam, i) {
-          marcador.detectForVideo(lienzoVacio(tam[0], tam[1]), t + i * 10);
+        [[640, 480], [480, 640], [320, 240]].forEach(function (tam) {
+          marcador.detectForVideo(lienzoVacio(tam[0], tam[1]), tsMP());
         });
         motor = 'mediapipe';
       })().catch(function (e) {
@@ -674,6 +694,7 @@ var Rostro = (function () {
 
   async function iniciar(videoEl) {
     sesion++;
+    var miSesion = sesion;
     video = videoEl;
     video.setAttribute('playsinline', '');
     video.muted = true;
@@ -692,6 +713,43 @@ var Rostro = (function () {
     } catch (e) {
       throw { mensaje: 'No se pudo cargar el reconocimiento facial. Revisa el internet.', tecnico: 'MOD' };
     }
+    await prepararImagen(miSesion);
+  }
+
+  /**
+   * Espera a que la imagen de la cámara sea estable antes de mostrarla y analizarla. Al abrirla, iOS entrega
+   * los primeros cuadros con un tamaño u orientación y luego cambia: en el video se veía la cara muy cerca,
+   * luego con franjas negras y luego normal. Mientras tanto el video sigue invisible ("Preparando cámara").
+   *
+   * La primera vez además se "calienta" el análisis con la imagen REAL: la primera cara que ven MediaPipe y
+   * face-api obliga al procesador gráfico a preparar programas nuevos, y eso traba la pantalla. Así ocurre
+   * aquí, detrás de la ruedita, y no a mitad de "Mira a la cámara".
+   */
+  async function prepararImagen(miSesion) {
+    var inicio = performance.now(), maxMs = calentadoConCamara ? 1500 : 3500;
+    var w = video.videoWidth, h = video.videoHeight, estableDesde = inicio, cuadros = 0, caras = 0;
+    while (performance.now() - inicio < maxMs) {
+      if (miSesion !== sesion || !stream) return;
+      await siguienteCuadro();
+      if (miSesion !== sesion || !stream) return;
+      if (video.videoWidth !== w || video.videoHeight !== h) {
+        w = video.videoWidth; h = video.videoHeight; estableDesde = performance.now(); cuadros = 0;
+        continue;
+      }
+      cuadros++;
+      if (!calentadoConCamara && motor === 'mediapipe' && marcador && w) {
+        try {
+          var r = marcador.detectForVideo(video, tsMP());
+          if (r.faceLandmarks && r.faceLandmarks.length) caras++;
+        } catch (e) { /* solo es calentamiento */ }
+      }
+      var estable = performance.now() - estableDesde >= 450 && cuadros >= 4;
+      if (estable && (calentadoConCamara || motor !== 'mediapipe' || caras >= 3)) break;
+    }
+    if (!calentadoConCamara && listoFA && w && miSesion === sesion && stream) {
+      try { await unDescriptor(); } catch (e) { /* solo es calentamiento */ }
+    }
+    calentadoConCamara = true;
   }
 
   /** Apaga la cámara y cancela cualquier análisis en curso (no queda nada corriendo en segundo plano). */
@@ -817,7 +875,7 @@ var Rostro = (function () {
 
   // ------------------------------------------------ Verificación con MediaPipe
   async function verificarMediaPipe(n, cb, seguir, diag, modo) {
-    var inicio = performance.now(), ultimoTs = 0, ultimaCara = 0;
+    var inicio = performance.now(), ultimaCara = 0;
     var fase = 'alinear', alineadoDesde = 0, base = [], baseH = 0, baseV = 0, basePuntos = null, inicial = null;
     var retos = modo === 'registro' ? null : mezclar(Object.keys(DIRECCIONES)).slice(0, 2);
     var reto = 0, picos = [], picoActual = null, sectores = [false, false, false, false, false, false, false, false];
@@ -844,9 +902,7 @@ var Rostro = (function () {
       }
       await siguienteCuadro();
       seguir();
-      var ts = performance.now();
-      if (ts <= ultimoTs) ts = ultimoTs + 1;
-      ultimoTs = ts;
+      var ts = tsMP();
       var l = leerMediaPipe(marcador.detectForVideo(video, ts));
       diag.cuadros++; diag.ms += performance.now() - ts;
 
@@ -1068,6 +1124,15 @@ var Rostro = (function () {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
       });
     }
+    // Kiosco: se bloquea el zoom con dos dedos. Safari ignora maximum-scale=1 desde iOS 10; en el video la
+    // página se agrandó y rebotó justo al cargar.
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (tipo) {
+      document.addEventListener(tipo, function (e) { e.preventDefault(); }, { passive: false });
+    });
+    document.addEventListener('touchmove', function (e) {
+      if (e.touches.length > 1 || (e.scale !== undefined && e.scale !== 1)) e.preventDefault();
+    }, { passive: false });
+
     function vibrar(patron) { try { if (navigator.vibrate) navigator.vibrate(patron); } catch (e) { /* sin vibración */ } }
     function esperarMs(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
     function inicial(nombre) { return String(nombre || '?').trim().charAt(0).toUpperCase(); }
@@ -1175,54 +1240,140 @@ var Rostro = (function () {
     }
 
     // ================================================================ Anillo del escáner (estilo Face ID)
+    /*
+     * El anillo se dibuja en UN solo lienzo, cuadro por cuadro (requestAnimationFrame). Todo lo que se ve
+     * (marcas que se encienden, marcas azules que respiran, el barrido de "Verificando", el verde del éxito)
+     * sale del mismo dibujo, así que no puede desincronizarse ni parpadear. Cada valor se acerca a su meta
+     * de forma suave según el tiempo real: si un cuadro llega tarde, la animación sigue en su lugar.
+     */
     var MARCAS = 72;
-    (function () {
-      var h = '';
+    var Anillo = (function () {
+      var lienzo = $('anillo'), ctx = lienzo.getContext('2d');
+      var BLANCO = [255, 255, 255], AZUL = [59, 149, 240], VERDE = [48, 180, 85], ROJO = [229, 53, 43];
+      var geo = [], meta = [], mostrada = [], nivel = [], azulMeta = [], azul = [];
       for (var i = 0; i < MARCAS; i++) {
         var a = (i / MARCAS) * Math.PI * 2 - Math.PI / 2;
-        var r1 = 90, r2 = 98;
-        h += '<line x1="' + (100 + r1 * Math.cos(a)).toFixed(2) + '" y1="' + (100 + r1 * Math.sin(a)).toFixed(2) +
-          '" x2="' + (100 + r2 * Math.cos(a)).toFixed(2) + '" y2="' + (100 + r2 * Math.sin(a)).toFixed(2) +
-          '" style="animation-delay:' + (i / MARCAS * 1.1).toFixed(3) + 's"/>';
+        geo.push([100 + 90 * Math.cos(a), 100 + 90 * Math.sin(a), 100 + 98 * Math.cos(a), 100 + 98 * Math.sin(a)]);
+        meta.push(false); mostrada.push(false); nivel.push(0); azulMeta.push(false); azul.push(0);
       }
-      $('anillo').innerHTML = h;
-      $('barrido').innerHTML = h;
-    })();
-    var lineasAnillo = Array.prototype.slice.call($('anillo').querySelectorAll('line'));
+      var modo = { buscando: false, procesando: false, exito: false, error: false };
+      var brillo = 1, tinte = 0, colorTinte = VERDE, barrido = 0;
+      var desdeBuscando = 0, desdeBarrido = 0, desdeAzul = 0;
+      var corriendo = false, ultimo = 0, lado = 0;
+      var calma = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
-    var _escEstado = null;
-    // Qué marcas deben estar encendidas (objetivo) y cuáles lo están (mostradas). Un ciclo de
-    // animación acerca las mostradas al objetivo poco a poco: el anillo se llena y vacía con suavidad.
-    var _escObjetivo = [], _escMostradas = [], _escCiclo = null;
-    for (var _k = 0; _k < MARCAS; _k++) { _escObjetivo.push(false); _escMostradas.push(false); }
-    function _cicloAnillo() {
-      _escCiclo = null;
-      var cambios = 0, pendientes = false;
-      for (var i = 0; i < MARCAS; i++) {
-        if (_escMostradas[i] === _escObjetivo[i]) continue;
-        if (cambios < 3) { _escMostradas[i] = _escObjetivo[i]; lineasAnillo[i].classList.toggle('on', _escObjetivo[i]); cambios++; }
-        else pendientes = true;
+      /** Acerca un valor a su meta (tau = segundos para recorrer ~63 % del camino). */
+      function seguir(actual, objetivo, dt, tau) { return objetivo + (actual - objetivo) * Math.exp(-dt / tau); }
+      /** Onda suave 0 → 1 → 0 con el periodo indicado (ms). */
+      function onda(t, periodo) { return 0.5 - 0.5 * Math.cos(2 * Math.PI * t / periodo); }
+      function mezclar(x, y, t) {
+        return [Math.round(x[0] + (y[0] - x[0]) * t), Math.round(x[1] + (y[1] - x[1]) * t), Math.round(x[2] + (y[2] - x[2]) * t)];
       }
-      if (pendientes) _pedirCiclo();
-    }
-    /** Siguiente cuadro de animación; si el navegador lo retrasa, sigue igual a los 34 ms (nunca se traba). */
-    function _pedirCiclo() {
-      if (_escCiclo) return;
-      var hecho = false;
-      function correr() { if (!hecho) { hecho = true; _cicloAnillo(); } }
-      _escCiclo = requestAnimationFrame(correr);
-      setTimeout(correr, 34);
-    }
+      function medir() {
+        var px = Math.round(lienzo.clientWidth * Math.min(window.devicePixelRatio || 1, 3));
+        if (px && px !== lado) { lado = px; lienzo.width = px; lienzo.height = px; }
+      }
+
+      function cuadro(ahora) {
+        var pantalla = $('sCamara');
+        if (!pantalla.classList.contains('visible') && !pantalla.classList.contains('saliendo')) { corriendo = false; return; }
+        requestAnimationFrame(cuadro);
+        var dt = Math.min(0.1, Math.max(0.001, (ahora - ultimo) / 1000));
+        ultimo = ahora;
+        medir();
+        if (!lado) return;
+
+        // Hasta 3 marcas cambian por cuadro (a 60 cuadros/s): el anillo se llena y se vacía como un barrido.
+        var cupo = Math.max(3, Math.round(dt * 180)), cambios = 0;
+        for (var i = 0; i < MARCAS && cambios < cupo; i++) {
+          if (mostrada[i] !== meta[i]) { mostrada[i] = meta[i]; cambios++; }
+        }
+
+        var final = modo.exito || modo.error;
+        var brilloMeta = 1;
+        if (modo.procesando && !final) brilloMeta = 0.35;
+        else if (modo.buscando && !final) brilloMeta = calma ? 0.75 : 0.5 + 0.5 * onda(ahora - desdeBuscando, 2000);
+        brillo = seguir(brillo, brilloMeta, dt, 0.18);
+        tinte = seguir(tinte, final ? 1 : 0, dt, 0.12);
+        barrido = seguir(barrido, modo.procesando && !final && !calma ? 1 : 0, dt, 0.15);
+        var giro = ((ahora - desdeBarrido) / 2400 * 360) % 360;
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, lado, lado);
+        ctx.setTransform(lado / 200, 0, 0, lado / 200, 0, 0);
+        ctx.lineWidth = 2.6;
+        ctx.lineCap = 'round';
+        for (var j = 0; j < MARCAS; j++) {
+          nivel[j] = seguir(nivel[j], mostrada[j] ? 1 : 0, dt, 0.09);
+          azul[j] = seguir(azul[j], azulMeta[j] && !mostrada[j] ? 1 : 0, dt, 0.12);
+          var alfa = 0.22 + 0.78 * nivel[j], c = BLANCO;
+          if (azul[j] > 0.003) {
+            // Marcas hacia donde hay que mirar: azul que respira, en ola (cada marca un poco después).
+            var pulso = calma ? 0.8 : 0.45 + 0.55 * onda(ahora - desdeAzul - j / MARCAS * 1100, 1600);
+            alfa = alfa * (1 - azul[j]) + pulso * azul[j];
+            c = mezclar(BLANCO, AZUL, azul[j]);
+          }
+          if (tinte > 0.003) { c = mezclar(c, colorTinte, tinte); alfa += (1 - alfa) * tinte; }
+          alfa *= brillo;
+          if (barrido > 0.003) {
+            // "Verificando": un cometa recorre el anillo en sentido horario (cola larga, punta suave).
+            // Solo cambia el brillo de cada marca: nada gira, así que nada puede desalinearse.
+            var fi = ((j * 5 - giro) % 360 + 360) % 360;
+            var s = (fi < 220 ? 0 : fi < 348 ? (fi - 220) / 128 : (360 - fi) / 12) * barrido;
+            if (s > 0) { c = mezclar(c, BLANCO, s); alfa += (1 - alfa) * s; }
+          }
+          if (alfa < 0.004) continue;
+          var g = geo[j];
+          ctx.strokeStyle = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + alfa.toFixed(3) + ')';
+          ctx.beginPath(); ctx.moveTo(g[0], g[1]); ctx.lineTo(g[2], g[3]); ctx.stroke();
+        }
+      }
+
+      function arrancar() {
+        if (corriendo) return;
+        corriendo = true;
+        ultimo = performance.now();
+        requestAnimationFrame(cuadro);
+      }
+
+      return {
+        arrancar: arrancar,
+        /** Qué marcas deben quedar encendidas (se encienden de a poco, en orden). */
+        metas: function (lista) { for (var i = 0; i < MARCAS; i++) meta[i] = !!lista[i]; arrancar(); },
+        /** Qué marcas señalan en azul hacia dónde mirar. */
+        azules: function (lista) {
+          var hay = false;
+          for (var i = 0; i < MARCAS; i++) { azulMeta[i] = !!lista[i]; hay = hay || azulMeta[i]; }
+          if (hay) desdeAzul = performance.now();
+          arrancar();
+        },
+        modo: function (m) {
+          var ahora = performance.now();
+          if (m.buscando && !modo.buscando) desdeBuscando = ahora;
+          if (m.procesando && !modo.procesando) desdeBarrido = ahora;
+          if (m.error) colorTinte = ROJO; else if (m.exito) colorTinte = VERDE;
+          modo = m;
+          arrancar();
+        },
+        /** Apaga todo de inmediato (al empezar un escaneo nuevo). */
+        vaciar: function () {
+          for (var i = 0; i < MARCAS; i++) { meta[i] = false; mostrada[i] = false; nivel[i] = 0; azulMeta[i] = false; azul[i] = 0; }
+          tinte = 0; barrido = 0; brillo = 1;
+        }
+      };
+    })();
+
     /** Índice de la marca en un ángulo de pantalla (0 = arriba, sentido horario). */
     function _marcaEn(grados) { return ((Math.round(grados / 360 * MARCAS) % MARCAS) + MARCAS) % MARCAS; }
     var _ANGULO = { arriba: 0, derecha: 90, abajo: 180, izquierda: 270 };
-    var _escObjetivoDir = null;
+    var _escEstado = null, _escObjetivoDir = null;
     // El anillo tiene dos capas: los tramos encendidos (hacia donde ya miró) y el llenado final.
     var _escTramos = [], _escLleno = 0;
     for (var _t = 0; _t < MARCAS; _t++) _escTramos.push(false);
     function _componerAnillo() {
-      for (var i = 0; i < MARCAS; i++) _escObjetivo[i] = _escTramos[i] || i < _escLleno;
-      _pedirCiclo();
+      var lista = [];
+      for (var i = 0; i < MARCAS; i++) lista.push(_escTramos[i] || i < _escLleno);
+      Anillo.metas(lista);
     }
     // Orden en que se encienden las marcas de un tramo: del centro hacia los lados.
     var _DESDE_CENTRO = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6];
@@ -1230,7 +1381,14 @@ var Rostro = (function () {
     var Escaner = {
       estado: function (nombre) {
         var c = 'escaner ' + (nombre || '');
-        if (c !== _escEstado) { _escEstado = c; $('escaner').className = c; }
+        if (c === _escEstado) return;
+        _escEstado = c;
+        $('escaner').className = c;
+        var m = ' ' + (nombre || '') + ' ';
+        Anillo.modo({
+          buscando: m.indexOf(' buscando ') >= 0, procesando: m.indexOf(' procesando ') >= 0,
+          exito: m.indexOf(' exito ') >= 0, error: m.indexOf(' error ') >= 0
+        });
       },
       /** Llena el anillo desde arriba en sentido horario (0 a 1), sin apagar los tramos ya encendidos. */
       progreso: function (p) {
@@ -1259,15 +1417,17 @@ var Rostro = (function () {
       objetivo: function (dir) {
         if (dir === _escObjetivoDir) return;
         _escObjetivoDir = dir;
-        lineasAnillo.forEach(function (l) { l.classList.remove('objetivo'); });
-        if (!dir) return;
-        for (var j = -6; j <= 6; j++) lineasAnillo[_marcaEn(_ANGULO[dir] + j * 5)].classList.add('objetivo');
+        var lista = [];
+        for (var i = 0; i < MARCAS; i++) lista.push(false);
+        if (dir) for (var j = -6; j <= 6; j++) lista[_marcaEn(_ANGULO[dir] + j * 5)] = true;
+        Anillo.azules(lista);
       },
       /** Apaga todo de inmediato (al empezar un escaneo nuevo). */
       vaciar: function () {
         _escLleno = 0;
-        for (var i = 0; i < MARCAS; i++) { _escTramos[i] = false; _escObjetivo[i] = false; _escMostradas[i] = false; lineasAnillo[i].classList.remove('on'); }
-        Escaner.objetivo(null);
+        for (var i = 0; i < MARCAS; i++) _escTramos[i] = false;
+        _escObjetivoDir = null;
+        Anillo.vaciar();
       },
       guia: function (texto, detalle, glifo) {
         if ($('guiaTexto').textContent !== texto) {
@@ -1320,7 +1480,7 @@ var Rostro = (function () {
     }
 
     // ================================================================ Estado general
-    var VERSION_KIOSCO = '4.3';
+    var VERSION_KIOSCO = '4.5';
     var CLAVE_TOKEN = 'asistencia_kiosco_token';
     var estado = { token: null, tienda: null, desfaseMs: 0, ticket: null, persona: null, acciones: [], registro: null, gps: null, timer: null, intento: 0, consentimiento: false };
 
@@ -1328,10 +1488,26 @@ var Rostro = (function () {
     function guardarToken(t) { try { localStorage.setItem(CLAVE_TOKEN, t); } catch (e) { /* sin almacenamiento */ } }
     function borrarToken() { try { localStorage.removeItem(CLAVE_TOKEN); } catch (e) { /* nada */ } }
 
+    var _salidaTimer = null;
+    /**
+     * Cambia de pantalla con un fundido: la nueva (opaca) aparece encima y la anterior se queda quieta debajo
+     * hasta que la nueva la cubre por completo. Nunca se ve un cuadro vacío ni un salto de claro a oscuro.
+     */
     function mostrar(id) {
-      if ($(id).classList.contains('visible')) return; // ya se ve: no se repite la animación de entrada
-      document.querySelectorAll('.pantalla').forEach(function (p) { p.classList.remove('visible'); });
-      $(id).classList.add('visible');
+      var nueva = $(id);
+      if (nueva.classList.contains('visible')) return; // ya se ve: no se repite la animación de entrada
+      clearTimeout(_salidaTimer);
+      document.querySelectorAll('.pantalla.saliendo').forEach(function (p) { p.classList.remove('saliendo'); });
+      document.querySelectorAll('.pantalla.visible').forEach(function (p) {
+        p.classList.remove('visible');
+        p.classList.add('saliendo');
+      });
+      nueva.classList.remove('saliendo');
+      nueva.classList.add('visible');
+      if (id === 'sCamara') Anillo.arrancar();
+      _salidaTimer = setTimeout(function () {
+        document.querySelectorAll('.pantalla.saliendo').forEach(function (p) { p.classList.remove('saliendo'); });
+      }, 520);
     }
     function programarRegreso(ms) { clearTimeout(estado.timer); estado.timer = setTimeout(reiniciar, ms); }
 
@@ -1414,9 +1590,16 @@ var Rostro = (function () {
         else { borrarToken(); estado.token = null; }
         setInterval(tic, 1000); tic();
         iniciarGps();
+        // El reconocimiento facial se descarga y "calienta" AQUÍ, todavía en la pantalla de carga. Es lo más
+        // pesado de todo (prepara programas para el procesador gráfico) y congela la pantalla por ratos: antes
+        // se hacía con el teclado ya visible y trababa el teclado y la espera de "Verificando".
+        $('cargandoTexto').textContent = 'Preparando reconocimiento facial';
+        await esperarMs(60); // que se alcance a pintar el texto antes del trabajo pesado
+        await Promise.race([
+          Rostro.precargar().catch(function () { /* sin internet: se reintenta al abrir la cámara */ }),
+          esperarMs(25000) // red muy lenta: no se deja el kiosco en carga, termina en segundo plano
+        ]);
         reiniciar();
-        // Se carga y "calienta" el reconocimiento facial cuando la pantalla ya está visible.
-        setTimeout(function () { Rostro.precargar().catch(function () { /* se reintenta al abrir la cámara */ }); }, 900);
       } catch (e) {
         $('cargaBarra').style.visibility = 'hidden';
         $('cargandoTexto').textContent = e.mensaje || 'No se pudo conectar.';
@@ -1450,10 +1633,9 @@ var Rostro = (function () {
         guardarToken(r.datos.token);
         estado.token = r.datos.token;
         ponerTienda(r.datos.tienda);
-        await ocultarEspera();
         vibrar([15, 40, 15]);
         aviso('Equipo activado para ' + r.datos.tienda.nombre, 'ok');
-        reiniciar();
+        reiniciar(); // pone la pantalla de inicio y quita la espera encima de ella
       } catch (e) {
         await ocultarEspera();
         tecladoActivar.error();
@@ -1466,7 +1648,8 @@ var Rostro = (function () {
       mostrarEspera('Verificando');
       try {
         var r = await llamar('identificar', { token: estado.token, codigo: codigo });
-        await ocultarEspera();
+        // La espera se quita DESPUÉS de poner la pantalla siguiente (queda encima y se desvanece): antes se
+        // quitaba primero y por un instante volvía a verse el teclado antes de la cámara.
         estado.ticket = r.datos.ticket;
         estado.persona = r.datos;
         var acciones = r.datos.acciones;
@@ -1475,7 +1658,11 @@ var Rostro = (function () {
           return resultado(true, 'Jornada terminada', 'Ya registraste tu salida de hoy' +
             (trabajado ? ' · trabajaste ' + duracionTexto(trabajado) : '') + '. Hasta mañana, ' + r.datos.nombre + '.');
         }
-        if (acciones.length === 1) return marcar(acciones[0]); // el sistema decide: un solo paso posible
+        if (acciones.length === 1) { // el sistema decide: un solo paso posible
+          marcar(acciones[0]);
+          ocultarEspera();
+          return;
+        }
         estado.acciones = acciones;
         $('avatar').textContent = inicial(r.datos.nombre);
         $('saludo').textContent = saludo() + ', ' + r.datos.nombre;
@@ -1491,6 +1678,7 @@ var Rostro = (function () {
             '<span class="flecha">' + icono('flecha') + '</span></button>';
         }).join('');
         mostrar('sAcciones');
+        ocultarEspera();
         programarRegreso(30000);
       } catch (e) {
         await ocultarEspera();
@@ -1510,19 +1698,40 @@ var Rostro = (function () {
      * Abre la cámara, hace la prueba de vida (con un reintento automático) y captura n descriptores.
      * Devuelve { cap, vigente }. Si la persona cancela, lanza { cancelado: true }.
      */
+    var _congelada = false;
+    /** Copia el cuadro actual de la cámara (con espejo y recortado igual que se ve) al lienzo "congelada". */
+    function congelarImagen() {
+      var v = $('video'), c = $('congelada');
+      var lado = Math.round(c.clientWidth * Math.min(window.devicePixelRatio || 1, 2));
+      if (!lado || !v.videoWidth || !v.videoHeight || v.readyState < 2) return false;
+      try {
+        c.width = lado; c.height = lado;
+        var ctx = c.getContext('2d'), vw = v.videoWidth, vh = v.videoHeight;
+        var esc = Math.max(lado / vw, lado / vh), w = vw * esc, h = vh * esc;
+        ctx.setTransform(-1, 0, 0, 1, lado, 0); // espejo, como el video en pantalla
+        ctx.drawImage(v, (lado - w) / 2, (lado - h) / 2, w, h);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
     async function escanear(titulo, n, modo) {
       clearTimeout(estado.timer);
       var miIntento = estado.intento;
       function vigente() { if (miIntento !== estado.intento) throw { cancelado: true }; }
       $('camTitulo').textContent = titulo;
-      $('congelada').removeAttribute('src');
+      _congelada = false;
+      $('video').classList.remove('lista');
       Escaner.vaciar(); Escaner.estado('buscando'); Escaner.pasos(1, 3);
       Escaner.guia('Preparando cámara', Rostro.listo() ? 'Un momento' : 'Preparando el reconocimiento facial', 'cargando');
       mostrar('sCamara');
       programarRegreso(120000); // nadie se queda atorado en la cámara
       try {
+        // iniciar() termina cuando la imagen de la cámara ya es estable: hasta entonces el video está invisible.
         await Rostro.iniciar($('video'));
         vigente();
+        $('video').classList.add('lista');
         Escaner.guia('Mira a la cámara', 'Mantén tu rostro dentro del círculo', 'rostro');
         var cap = null, ultimoError = null;
         for (var intento = 1; intento <= 2 && !cap; intento++) {
@@ -1544,9 +1753,11 @@ var Rostro = (function () {
         }
         if (!cap) throw ultimoError;
         vigente();
-        // Se congela la imagen y el anillo pasa a "procesando" mientras responde el servidor.
-        $('congelada').src = cap.foto;
-        Escaner.objetivo(null); Escaner.estado('final procesando'); Escaner.progreso(1);
+        // Se congela la imagen y el anillo pasa a "procesando" mientras responde el servidor. El cuadro actual
+        // se copia a un lienzo AL INSTANTE y solo después se apaga la cámara (en el finally): antes se ponía
+        // la foto JPEG, que Safari tarda en decodificar, y el círculo se veía negro unos cuadros.
+        _congelada = congelarImagen();
+        Escaner.objetivo(null); Escaner.estado((_congelada ? 'final ' : '') + 'procesando'); Escaner.progreso(1);
         Escaner.guia('Verificando identidad', 'Esto toma unos segundos', 'cargando');
         return { cap: cap, vigente: vigente };
       } finally {
@@ -1678,7 +1889,6 @@ var Rostro = (function () {
       mostrarEspera('Verificando código');
       try {
         var r = await llamar('validarRegistro', { token: estado.token, codigo: codigo });
-        await ocultarEspera();
         estado.registro = r.datos;
         estado.consentimiento = false;
         $('regAcepto').className = 'interruptor';
@@ -1686,6 +1896,7 @@ var Rostro = (function () {
         $('regAvatar').textContent = inicial(r.datos.nombre);
         $('regNombre').textContent = r.datos.nombre;
         mostrar('sRegConsentimiento');
+        ocultarEspera();
         programarRegreso(180000);
       } catch (e) {
         await ocultarEspera();
@@ -1729,6 +1940,9 @@ var Rostro = (function () {
 
     // ================================================================ Resultado y errores
     function resultado(ok, titulo, detalle, hora, nombre, foto, tecnico) {
+      // Si viene de la cámara (fondo negro), el resultado también es oscuro: sin fogonazo de luz.
+      var desdeCamara = $('sCamara').classList.contains('visible');
+      $('sResultado').classList.toggle('oscuro', desdeCamara);
       ocultarEspera();
       $('resIcono').setAttribute('class', 'resultado-icono ' + (ok ? 'ok' : 'mal'));
       $('resTrazo').setAttribute('d', ok ? 'M33 53l13 13 25-27' : 'M38 38l28 28M66 38L38 66');
@@ -1788,7 +2002,7 @@ var Rostro = (function () {
       if ($('sCamara').classList.contains('visible')) {
         // El anillo se pone rojo y tiembla un instante antes de explicar el error.
         var miIntento = estado.intento;
-        Escaner.estado(($('congelada').src ? 'final ' : '') + 'error');
+        Escaner.estado((_congelada ? 'final ' : '') + 'error');
         Escaner.guia(tituloError(e), '', '');
         vibrar([30, 60, 30]);
         await esperarMs(1500);
