@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <meta name="referrer" content="no-referrer">
   <!-- Solo se permite hablar con Google Apps Script y cargar la librería de rostro: bloquea código inyectado. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src https://script.google.com https://script.googleusercontent.com https://cdn.jsdelivr.net; media-src 'self' blob: mediastream:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cdn.jsdelivr.net https://storage.googleapis.com; media-src 'self' blob: mediastream:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="mobile-web-app-capable" content="yes">
@@ -57,7 +57,7 @@
     .pantalla {
       position: fixed; inset: 0; display: none; flex-direction: column; align-items: center;
       padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
-      overflow-y: auto;
+      overflow-x: hidden; overflow-y: auto;
     }
     .pantalla.visible { display: flex; animation: entrar .6s cubic-bezier(.25, .8, .25, 1) both; }
     @keyframes entrar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
@@ -86,12 +86,10 @@
     .boton-enlace svg.i { width: 20px; height: 20px; }
 
     /* ================================================================ Indicador de carga (estilo iOS) */
-    .spinner { position: relative; width: 28px; height: 28px; }
-    .spinner span {
-      position: absolute; left: 46%; top: 0; width: 8%; height: 28%; border-radius: 4px; background: currentColor;
-      transform-origin: 50% 178%; opacity: .15; animation: aspa 1s linear infinite;
-    }
-    @keyframes aspa { from { opacity: 1; } to { opacity: .15; } }
+    .spinner { width: 28px; height: 28px; display: block; will-change: transform; animation: ruedita .9s steps(8) infinite; }
+    .spinner svg { width: 100%; height: 100%; display: block; }
+    .spinner line { stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+    @keyframes ruedita { to { transform: rotate(360deg); } }
 
     /* ================================================================ Arranque */
     .marca {
@@ -180,7 +178,8 @@
     .pasos span.activo { width: 34px; background: #fff; }
     .pasos span.hecho { background: var(--ok); }
 
-    .escaner { position: relative; width: min(82vw, 360px); aspect-ratio: 1; margin-top: 4vh; }
+    .escaner { position: relative; width: min(82vw, 360px); aspect-ratio: 1; margin-top: 4vh; flex: none; border-radius: 50%; overflow: hidden; }
+    /* El círculo recorta lo que gira: al rotar, las esquinas del cuadro ya no empujan la página. */
     .escaner video, .escaner .congelada {
       position: absolute; inset: 11%; width: 78%; height: 78%; border-radius: 50%; object-fit: cover;
       transform: scaleX(-1); background: #111;
@@ -188,7 +187,7 @@
     .escaner .congelada { display: none; transform: none; }
     .escaner.final .congelada { display: block; }
     .escaner svg.anillo { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-    .anillo line { stroke: rgba(255,255,255,.22); stroke-width: 2.6; stroke-linecap: round; transition: stroke .25s; }
+    .anillo line { stroke: rgba(255,255,255,.22); stroke-width: 2.6; stroke-linecap: round; transition: stroke .35s ease-out; }
     .anillo line.on { stroke: #fff; }
     .escaner .anillo { will-change: opacity; transition: opacity .4s; }
     .escaner.buscando .anillo { animation: respirar 2s ease-in-out infinite; }
@@ -201,7 +200,7 @@
     .barrido svg { width: 100%; height: 100%; overflow: visible; }
     .barrido line { stroke: #fff; stroke-width: 2.6; stroke-linecap: round; }
     .escaner.procesando .anillo { opacity: .35; }
-    .escaner.procesando .barrido { opacity: 1; animation: rotar 1.2s linear infinite; }
+    .escaner.procesando .barrido { opacity: 1; animation: rotar 2.4s linear infinite; }
     @keyframes rotar { to { transform: rotate(360deg); } }
     .escaner.exito .anillo line { stroke: var(--ok); }
     .escaner.exito .anillo, .escaner.error .anillo { opacity: 1; }
@@ -242,6 +241,7 @@
     .persona { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 10px 18px 10px 10px; border-radius: 999px; background: var(--superficie); box-shadow: var(--sombra); animation: subir .6s .3s var(--curva) both; }
     .persona img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
     .persona span { font-weight: 600; font-size: 17px; }
+    .version { color: var(--texto-3); font-size: 11px; letter-spacing: .02em; margin-top: 2px; }
     .tecnico { color: var(--texto-3); font-size: 12px; margin: 4px 0 0; font-family: ui-monospace, Menlo, Consolas, monospace; }
     .regreso { width: 120px; height: 4px; border-radius: 4px; background: var(--linea); overflow: hidden; margin: 22px 0 6px; }
     .regreso i { display: block; height: 100%; background: var(--texto-3); transform-origin: left; animation: vaciar linear forwards; }
@@ -321,6 +321,7 @@
       <div class="teclado" id="teclado"></div>
       <div class="espacio"></div>
       <button class="boton-enlace" onclick="abrirRegistro()"><svg class="i" viewBox="0 0 24 24" data-i="rostro"></svg>Registrar rostro</button>
+      <div class="version" id="version"></div>
     </div>
   </section>
 
@@ -419,59 +420,134 @@
   </script>
   <script>
     /**
- * Módulo de rostro del kiosco. Usa @vladmandic/face-api (cargado desde jsDelivr).
- *   Rostro.precargar()                      // modelos + "calentamiento" en segundo plano
+ * Motor de rostro del kiosco.
+ *
+ *  - Seguimiento en tiempo real (30 cuadros/s): MediaPipe Face Landmarker de Google
+ *    (478 puntos, ángulo de la cabeza y apertura de cada ojo). Detecta un parpadeo natural:
+ *    la persona solo mira a la cámara; una foto no parpadea.
+ *  - Identidad: @vladmandic/face-api (red ResNet de dlib, la misma que usa la librería de
+ *    Python "face_recognition"). Saca un descriptor de 128 números que se compara EN EL SERVIDOR.
+ *  - Si MediaPipe no carga (equipo muy antiguo), se usa el método anterior: girar la cabeza.
+ *
+ *   Rostro.precargar()                         // descarga y "calienta" todo en segundo plano
  *   await Rostro.iniciar(videoEl)
  *   const { descriptores, foto } = await Rostro.verificar(n, cb)
  *   Rostro.detener()
- *
- * Verificación en 4 fases, pensada para ser fácil:
- *   1. Alinear: rostro dentro del círculo unos instantes.
- *   2. Girar: la cabeza hacia cualquier lado (prueba de vida: una foto plana no cambia sus proporciones).
- *   3. Regresar: mirar de nuevo al frente.
- *   4. Captura: n lecturas del rostro de frente.
- * cb recibe { fase, texto, detalle, icono, cara, progreso (0 a 1 del total) }.
- * Solo calcula descriptores; la comparación de identidad se hace en el servidor.
+ * cb recibe { fase (1-3), texto, detalle, icono, cara, progreso (0 a 1) }.
  */
 var Rostro = (function () {
-  var MODELOS = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model/';
-  var video = null, stream = null, listo = false, cargando = null, sesion = 0;
-  var TIEMPO_MAX_MS = 25000;
-  // Medido con fotos reales: un giro natural de ~25° mueve la proporción más de 0.15;
-  // una foto plana inclinada o aplastada casi siempre menos de 0.12.
-  var GIRO_MIN = 0.14;      // cuánto debe moverse la nariz respecto a la mandíbula
-  var FRENTE_MAX = 0.07;    // tolerancia para considerar "de frente" otra vez
+  var VERSION_MP = '1.0.1';
+  var URL_MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + VERSION_MP;
+  var MODELO_MP = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+  var MODELOS_FA = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model/';
 
-  function esperar(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  /** Deja que el navegador pinte antes de seguir (animaciones fluidas mientras se analiza). */
-  function respirar() { return new Promise(function (r) { requestAnimationFrame(function () { setTimeout(r, 0); }); }); }
-  function opcRapida() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }); }
-  function opcCaptura() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.45 }); }
+  var video = null, stream = null, sesion = 0;
+  var marcador = null, cargaMP = null, cargaFA = null, listoFA = false, motor = 'pendiente';
+
+  // Parpadeo y encuadre (MediaPipe)
+  // Un parpadeo real suele llevar "ojo cerrado" a 0.5–0.9; se deja margen para ojos pequeños, lentes
+  // o cámaras modestas. Una foto inclinada de lado BAJA este valor; inclinada hacia atrás lo sube,
+  // pero también cambia el ángulo de la cabeza (ver MAX_MOVIMIENTO_GRADOS).
+  var SUBIDA_PARPADEO = 0.15;    // cuánto debe subir "ojo cerrado" sobre lo normal de la persona
+  var MINIMO_CERRADO = 0.22;
+  var MAX_PARPADEO_MS = 1000;    // un parpadeo humano dura 0.1–0.4 s
+  var MAX_MOVIMIENTO_GRADOS = 8; // la cabeza casi no se mueve al parpadear (una foto inclinada sí)
+  var ALINEADO_MS = 700;         // tiempo bien encuadrado antes de capturar
+  var PEDIR_PARPADEO_MS = 2000;  // si no parpadea solo en 2 s, se le pide con suavidad
+  var TIEMPO_MAX_MS = 12000;     // por intento (hay un reintento automático)
+
+  // Método alterno (girar la cabeza)
+  var GIRO_MIN = 0.14, FRENTE_MAX = 0.07;
 
   /**
-   * Carga los modelos una sola vez y los "calienta": la primera detección prepara el procesador
-   * gráfico y congela la pantalla 1-3 s. Así ocurre al abrir la app y no frente a la persona.
+   * Espera el siguiente cuadro de la cámara. Si el navegador lo retrasa (ahorro de batería,
+   * pestaña en segundo plano), sigue de todos modos: el análisis nunca se queda congelado.
    */
-  function precargar() {
-    if (listo) return Promise.resolve();
-    if (!cargando) {
-      cargando = Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODELOS),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODELOS),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODELOS)
-      ]).then(async function () {
-        var c = document.createElement('canvas');
-        c.width = 320; c.height = 240;
-        c.getContext('2d').fillRect(0, 0, 320, 240);
-        await faceapi.detectAllFaces(c, opcRapida()).withFaceLandmarks();
-        await faceapi.detectAllFaces(c, opcCaptura());
-        await faceapi.computeFaceDescriptor(c);
-        listo = true;
-      }).catch(function (e) { cargando = null; throw e; });
-    }
-    return cargando;
+  function siguienteCuadro() {
+    return new Promise(function (r) {
+      var hecho = false;
+      function listo() { if (!hecho) { hecho = true; r(); } }
+      if (video && video.requestVideoFrameCallback) video.requestVideoFrameCallback(listo);
+      else requestAnimationFrame(listo);
+      setTimeout(listo, 40);
+    });
+  }
+  /** Deja que el navegador pinte antes de seguir (animaciones fluidas mientras se analiza). */
+  function respirar() {
+    return new Promise(function (r) {
+      var hecho = false;
+      function listo() { if (!hecho) { hecho = true; setTimeout(r, 0); } }
+      requestAnimationFrame(listo);
+      setTimeout(listo, 50);
+    });
+  }
+  function opcCaptura() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.45 }); }
+  function opcRapida() { return new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }); }
+  function promedio(a) { return a.reduce(function (s, x) { return s + x; }, 0) / a.length; }
+
+  function lienzoVacio() {
+    var c = document.createElement('canvas');
+    c.width = 320; c.height = 240;
+    var x = c.getContext('2d'); x.fillStyle = '#777'; x.fillRect(0, 0, 320, 240);
+    return c;
   }
 
+  // ------------------------------------------------ Carga y calentamiento
+  function cargarFaceApi() {
+    if (!cargaFA) {
+      cargaFA = Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODELOS_FA),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODELOS_FA),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODELOS_FA)
+      ]).then(async function () {
+        var c = lienzoVacio();
+        await faceapi.detectAllFaces(c, opcCaptura()).withFaceLandmarks();
+        await faceapi.detectAllFaces(c, opcRapida()).withFaceLandmarks();
+        await faceapi.computeFaceDescriptor(c);
+        listoFA = true;
+      }).catch(function (e) { cargaFA = null; throw e; });
+    }
+    return cargaFA;
+  }
+
+  function cargarMediaPipe() {
+    if (!cargaMP) {
+      cargaMP = (async function () {
+        var mp = await import(URL_MP + '/vision_bundle.mjs');
+        var archivos = await mp.FilesetResolver.forVisionTasks(URL_MP + '/wasm');
+        var opciones = function (delegado) {
+          return {
+            baseOptions: { modelAssetPath: MODELO_MP, delegate: delegado },
+            runningMode: 'VIDEO', numFaces: 2,
+            outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true
+          };
+        };
+        try {
+          marcador = await mp.FaceLandmarker.createFromOptions(archivos, opciones('GPU'));
+        } catch (e) {
+          marcador = await mp.FaceLandmarker.createFromOptions(archivos, opciones('CPU'));
+        }
+        // La primera detección prepara el procesador gráfico (varios segundos): se hace aquí, no frente a la persona.
+        var c = lienzoVacio(), t = performance.now();
+        marcador.detectForVideo(c, t);
+        marcador.detectForVideo(c, t + 1);
+        motor = 'mediapipe';
+      })().catch(function (e) {
+        motor = 'faceapi'; // equipo sin soporte: se usa el método de girar la cabeza
+        console.warn('MediaPipe no disponible, se usa el método alterno', e);
+      });
+    }
+    return cargaMP;
+  }
+
+  /** Carga primero MediaPipe y luego face-api (en serie: calentar los dos a la vez traba más la pantalla). */
+  function precargar() {
+    return cargarMediaPipe().then(cargarFaceApi);
+  }
+
+  function estaListo() { return listoFA && motor !== 'pendiente'; }
+
+  // ------------------------------------------------ Cámara
   function mensajeCamara(e) {
     if (e.name === 'NotAllowedError') return 'Permite el uso de la cámara para esta página y vuelve a intentarlo.';
     if (e.name === 'NotFoundError' || e.name === 'OverconstrainedError') return 'No se encontró una cámara en este equipo.';
@@ -486,7 +562,7 @@ var Rostro = (function () {
     video.muted = true;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false
       });
     } catch (e) {
       throw { mensaje: mensajeCamara(e), tecnico: 'CAM-' + e.name };
@@ -509,27 +585,21 @@ var Rostro = (function () {
     if (video) video.srcObject = null;
   }
 
-  // ------------------------------------------------ Lectura de un cuadro
-  function proporcionGiro(lm) {
-    var p = lm.positions;
-    return (p[30].x - p[0].x) / (p[16].x - p[0].x); // ~0.5 de frente
+  // ------------------------------------------------ Diagnóstico
+  function crearDiagnostico() {
+    return {
+      cuadros: 0, conCara: 0, ms: 0, maxOjo: 0, maxGiro: 0, parpadeos: 0,
+      /** Código corto para soporte: motor, fase, cuadros/con rostro, ojo o giro máximo, ms por cuadro. */
+      codigo: function (fase) {
+        var mp = motor === 'mediapipe';
+        return (mp ? 'M ' : 'F ') + fase + ' ' + this.cuadros + '/' + this.conCara +
+          (mp ? ' o' + Math.round(this.maxOjo * 100) + ' p' + this.parpadeos : ' g' + Math.round(this.maxGiro * 100)) +
+          ' ' + Math.round(this.ms / Math.max(1, this.cuadros)) + 'ms';
+      }
+    };
   }
 
-  async function leer(diag) {
-    var t0 = performance.now();
-    var r = await faceapi.detectAllFaces(video, opcRapida()).withFaceLandmarks();
-    diag.cuadros++; diag.ms += performance.now() - t0;
-    if (r.length === 0) return { cara: false, motivo: 'Coloca tu rostro dentro del círculo' };
-    if (r.length > 1) return { cara: false, motivo: 'Solo una persona frente a la cámara' };
-    diag.conCara++;
-    var box = r[0].detection.box;
-    var lado = Math.min(video.videoWidth, video.videoHeight);
-    if (box.width / lado < 0.2) return { cara: false, motivo: 'Acércate un poco más' };
-    return { cara: true, giro: proporcionGiro(r[0].landmarks) };
-  }
-
-  function promedio(a) { return a.reduce(function (s, x) { return s + x; }, 0) / a.length; }
-
+  // ------------------------------------------------ Captura de identidad
   function tomarFoto() {
     var w = 480, h = Math.round(video.videoHeight * w / video.videoWidth);
     var c = document.createElement('canvas');
@@ -540,46 +610,165 @@ var Rostro = (function () {
     return c.toDataURL('image/jpeg', 0.72);
   }
 
-  /** Código corto para soporte: cuadros analizados / con rostro / giro máximo / ms por cuadro. */
-  function codigoTecnico(diag, fase) {
-    return fase + ' ' + diag.cuadros + '/' + diag.conCara + ' g' + Math.round(diag.maxGiro * 100) +
-      ' ' + Math.round(diag.ms / Math.max(1, diag.cuadros)) + 'ms';
+  /** Captura n descriptores de identidad (face-api). Mismo método que en el registro del rostro. */
+  async function capturarDescriptores(n, cb, seguir, diag) {
+    var descriptores = [], foto = null, fin = Date.now() + 10000;
+    cb({ fase: 3, texto: 'Perfecto, no te muevas', detalle: '', icono: 'rostro', cara: true, progreso: 0.75 });
+    while (descriptores.length < n && Date.now() < fin) {
+      seguir();
+      var r = await faceapi.detectAllFaces(video, opcCaptura()).withFaceLandmarks().withFaceDescriptors();
+      seguir();
+      if (r.length === 1) {
+        if (!foto) foto = tomarFoto();
+        descriptores.push(Array.from(r[0].descriptor, function (x) { return Math.round(x * 1e5) / 1e5; }));
+      }
+      cb({ fase: 3, texto: 'Perfecto, no te muevas', detalle: r.length === 1 ? '' : 'Mira directo a la cámara', icono: 'rostro', cara: true,
+        progreso: 0.75 + 0.25 * descriptores.length / n });
+      await respirar();
+    }
+    if (descriptores.length < n) {
+      throw { mensaje: 'No pudimos ver bien tu rostro. Busca mejor luz e intenta de nuevo.', tecnico: diag.codigo('CAPTURA') };
+    }
+    return { descriptores: descriptores, foto: foto };
   }
 
-  // ------------------------------------------------ Verificación completa
-  async function verificar(n, cb) {
-    var miSesion = sesion;
-    function seguir() { if (miSesion !== sesion || !stream) throw { cancelado: true }; }
-    var diag = { cuadros: 0, conCara: 0, maxGiro: 0, ms: 0 };
-    var inicio = Date.now();
-    var fase = 'alinear', base = [], baseGiro = 0;
+  // ------------------------------------------------ Verificación con MediaPipe (mirar + parpadear)
+  function leerMediaPipe(r) {
+    if (!r.faceLandmarks || r.faceLandmarks.length === 0) return { cara: false, motivo: 'Coloca tu rostro dentro del círculo' };
+    if (r.faceLandmarks.length > 1) return { cara: false, motivo: 'Solo una persona frente a la cámara' };
+    var lm = r.faceLandmarks[0];
+    var minX = 1, maxX = 0, minY = 1, maxY = 0;
+    for (var i = 0; i < lm.length; i++) {
+      var p = lm[i];
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    var ancho = maxX - minX, cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    var bs = {};
+    r.faceBlendshapes[0].categories.forEach(function (c) { bs[c.categoryName] = c.score; });
+    var m = r.facialTransformationMatrixes[0].data;
+    var l = {
+      cara: true, motivo: '',
+      ojo: (bs.eyeBlinkLeft + bs.eyeBlinkRight) / 2,
+      yaw: Math.asin(Math.max(-1, Math.min(1, -m[2]))) * 180 / Math.PI,
+      pitch: Math.atan2(m[6], m[10]) * 180 / Math.PI
+    };
+    // La cámara llega en vertical u horizontal según el equipo; el tamaño se mide contra el ancho.
+    var minimo = video.videoWidth > video.videoHeight ? 0.22 : 0.32;
+    if (ancho < minimo) l.motivo = 'Acércate un poco';
+    else if (ancho > 0.92) l.motivo = 'Aléjate un poco';
+    else if (Math.abs(cx - 0.5) > 0.2 || Math.abs(cy - 0.5) > 0.22) l.motivo = 'Centra tu rostro en el círculo';
+    else if (Math.abs(l.yaw) > 28) l.motivo = 'Mira de frente a la cámara';
+    return l;
+  }
 
-    function tiempo() { return Date.now() - inicio < TIEMPO_MAX_MS; }
+  async function verificarMediaPipe(n, cb, seguir, diag) {
+    var inicio = performance.now(), ultimoTs = 0, visto = false;
+    var alineadoDesde = 0, base = [], cerradoEn = 0, poseCierre = null, parpadeo = false;
 
-    // Fases 1 a 3: alinear, girar y regresar.
-    while (fase !== 'captura') {
-      if (!tiempo()) {
-        var msj = fase === 'alinear' ? 'No logramos ver tu rostro. Acércate y busca buena luz de frente.'
-          : fase === 'girar' ? 'No detectamos el giro. Gira la cabeza un poco más, despacio.'
-            : 'No detectamos que volvieras al frente.';
-        throw { mensaje: msj, tecnico: codigoTecnico(diag, fase.toUpperCase()) };
-      }
+    while (true) {
       seguir();
-      var l = await leer(diag);
+      if (performance.now() - inicio > TIEMPO_MAX_MS) {
+        throw {
+          mensaje: !visto ? 'No logramos ver tu rostro. Acércate y busca buena luz de frente.'
+            : !parpadeo ? 'No detectamos el parpadeo. Mira a la cámara y parpadea una vez, con calma.'
+              : 'Mantén tu rostro centrado dentro del círculo.',
+          tecnico: diag.codigo(!visto ? 'ROSTRO' : !parpadeo ? 'PARPADEO' : 'ENCUADRE')
+        };
+      }
+      await siguienteCuadro();
+      seguir();
+      var ts = performance.now();
+      if (ts <= ultimoTs) ts = ultimoTs + 1;
+      ultimoTs = ts;
+      var l = leerMediaPipe(marcador.detectForVideo(video, ts));
+      diag.cuadros++; diag.ms += performance.now() - ts;
+
+      if (!l.cara) {
+        alineadoDesde = 0; cerradoEn = 0;
+        cb({ fase: 1, texto: 'Mira a la cámara', detalle: l.motivo, icono: 'rostro', cara: false, progreso: 0 });
+        continue;
+      }
+      visto = true;
+      diag.conCara++;
+      diag.maxOjo = Math.max(diag.maxOjo, l.ojo);
+
+      // --- Parpadeo, medido contra el nivel normal de cada persona
+      var normal = base.length ? promedio(base) : l.ojo;
+      if (!cerradoEn) {
+        if (base.length >= 3 && l.ojo >= Math.max(MINIMO_CERRADO, normal + SUBIDA_PARPADEO)) {
+          cerradoEn = ts; poseCierre = { yaw: l.yaw, pitch: l.pitch };
+        } else {
+          base.push(l.ojo);
+          if (base.length > 20) base.shift();
+        }
+      } else if (ts - cerradoEn > MAX_PARPADEO_MS) {
+        cerradoEn = 0; // ojos cerrados demasiado tiempo: no es un parpadeo
+      } else if (Math.abs(l.yaw - poseCierre.yaw) > MAX_MOVIMIENTO_GRADOS || Math.abs(l.pitch - poseCierre.pitch) > MAX_MOVIMIENTO_GRADOS) {
+        cerradoEn = 0; // la cabeza se movió mucho: típico de una foto inclinada, no cuenta
+      } else if (l.ojo <= normal + SUBIDA_PARPADEO * 0.5) {
+        cerradoEn = 0;
+        if (!l.motivo) { parpadeo = true; diag.parpadeos++; }
+      }
+
+      // --- Encuadre
+      if (l.motivo) {
+        alineadoDesde = 0;
+        cb({ fase: 1, texto: 'Mira a la cámara', detalle: l.motivo, icono: 'rostro', cara: true, progreso: 0.08 });
+        continue;
+      }
+      if (!alineadoDesde) alineadoDesde = ts;
+      var alineado = Math.min((ts - alineadoDesde) / ALINEADO_MS, 1);
+      if (alineado >= 1 && parpadeo) break;
+
+      if (!parpadeo && ts - alineadoDesde > PEDIR_PARPADEO_MS) {
+        cb({ fase: 2, texto: 'Parpadea una vez', detalle: 'Con calma, como lo haces normalmente', icono: 'ojo', cara: true, progreso: 0.45 });
+      } else {
+        cb({ fase: parpadeo ? 2 : 1, texto: 'Mira a la cámara', detalle: 'Mantén tu rostro dentro del círculo', icono: 'rostro', cara: true,
+          progreso: 0.1 + 0.35 * alineado + (parpadeo ? 0.25 : 0) });
+      }
+    }
+    return capturarDescriptores(n, cb, seguir, diag);
+  }
+
+  // ------------------------------------------------ Método alterno (equipos sin MediaPipe): girar la cabeza
+  async function leerFaceApi(diag) {
+    var t0 = performance.now();
+    var r = await faceapi.detectAllFaces(video, opcRapida()).withFaceLandmarks();
+    diag.cuadros++; diag.ms += performance.now() - t0;
+    if (r.length === 0) return { cara: false, motivo: 'Coloca tu rostro dentro del círculo' };
+    if (r.length > 1) return { cara: false, motivo: 'Solo una persona frente a la cámara' };
+    diag.conCara++;
+    var lado = Math.min(video.videoWidth, video.videoHeight);
+    if (r[0].detection.box.width / lado < 0.2) return { cara: false, motivo: 'Acércate un poco más' };
+    var p = r[0].landmarks.positions;
+    return { cara: true, giro: (p[30].x - p[0].x) / (p[16].x - p[0].x) };
+  }
+
+  async function verificarGiro(n, cb, seguir, diag) {
+    var inicio = Date.now(), fase = 'alinear', base = [], baseGiro = 0;
+    while (fase !== 'captura') {
+      seguir();
+      if (Date.now() - inicio > 25000) {
+        throw {
+          mensaje: fase === 'alinear' ? 'No logramos ver tu rostro. Acércate y busca buena luz de frente.' : 'No detectamos el giro. Gira la cabeza un poco más, despacio.',
+          tecnico: diag.codigo(fase.toUpperCase())
+        };
+      }
+      var l = await leerFaceApi(diag);
       await respirar();
       seguir();
-
       if (fase === 'alinear') {
         if (!l.cara) { base = []; cb({ fase: 1, texto: 'Mira a la cámara', detalle: l.motivo, icono: 'rostro', cara: false, progreso: 0 }); continue; }
         base.push(l.giro);
         cb({ fase: 1, texto: 'Mira a la cámara', detalle: 'Mantén tu rostro dentro del círculo', icono: 'rostro', cara: true, progreso: 0.25 * base.length / 3 });
-        if (base.length >= 3) { baseGiro = promedio(base); fase = 'girar'; await esperar(250); }
+        if (base.length >= 3) { baseGiro = promedio(base); fase = 'girar'; }
         continue;
       }
-
       if (fase === 'girar') {
         if (!l.cara) {
-          // De perfil el detector puede perder el rostro: si ya venía girando, cuenta como giro.
           if (diag.maxGiro > GIRO_MIN * 0.65) fase = 'regresar';
           else cb({ fase: 2, texto: 'Gira la cabeza hacia un lado', detalle: l.motivo, icono: 'rostro', cara: false, progreso: 0.25 });
           continue;
@@ -590,35 +779,24 @@ var Rostro = (function () {
         else cb({ fase: 2, texto: 'Gira la cabeza hacia un lado', detalle: 'Despacio, como mirando sobre tu hombro', icono: 'giro', cara: true, progreso: 0.25 + 0.35 * Math.min(desv / GIRO_MIN, 1) });
         continue;
       }
-
-      // fase === 'regresar'
       cb({ fase: 2, texto: 'Ahora mira al frente', detalle: '', icono: 'rostro', cara: true, progreso: 0.65 });
       if (l.cara && Math.abs(l.giro - baseGiro) <= FRENTE_MAX) fase = 'captura';
     }
-
-    // Fase 4: captura de frente.
-    var descriptores = [], foto = null, finCaptura = Date.now() + 12000;
-    cb({ fase: 3, texto: 'Perfecto, no te muevas', detalle: '', icono: 'rostro', cara: true, progreso: 0.7 });
-    while (descriptores.length < n && Date.now() < finCaptura) {
-      seguir();
-      var r = await faceapi.detectAllFaces(video, opcCaptura()).withFaceLandmarks().withFaceDescriptors();
-      await respirar();
-      seguir();
-      if (r.length !== 1) {
-        cb({ fase: 3, texto: 'Perfecto, no te muevas', detalle: 'Mira directo a la cámara', icono: 'rostro', cara: false, progreso: 0.7 + 0.3 * descriptores.length / n });
-        continue;
-      }
-      if (!foto) foto = tomarFoto();
-      descriptores.push(Array.from(r[0].descriptor, function (x) { return Math.round(x * 1e5) / 1e5; }));
-      cb({ fase: 3, texto: 'Perfecto, no te muevas', detalle: '', icono: 'rostro', cara: true, progreso: 0.7 + 0.3 * descriptores.length / n });
-    }
-    if (descriptores.length < n) {
-      throw { mensaje: 'No pudimos ver bien tu rostro. Busca mejor luz e intenta de nuevo.', tecnico: codigoTecnico(diag, 'CAPTURA') };
-    }
-    return { descriptores: descriptores, foto: foto };
+    return capturarDescriptores(n, cb, seguir, diag);
   }
 
-  return { precargar: precargar, iniciar: iniciar, detener: detener, verificar: verificar };
+  // ------------------------------------------------ Entrada principal
+  async function verificar(n, cb) {
+    var miSesion = sesion;
+    function seguir() { if (miSesion !== sesion || !stream) throw { cancelado: true }; }
+    var diag = crearDiagnostico();
+    return motor === 'mediapipe' ? verificarMediaPipe(n, cb, seguir, diag) : verificarGiro(n, cb, seguir, diag);
+  }
+
+  return {
+    precargar: precargar, listo: estaListo, motor: function () { return motor; },
+    iniciar: iniciar, detener: detener, verificar: verificar
+  };
 })();
 
   </script>
@@ -680,13 +858,25 @@ var Rostro = (function () {
     }
 
     function crearSpinner(el) {
-      var h = '';
-      for (var i = 0; i < 12; i++) h += '<span style="transform:rotate(' + (i * 30) + 'deg);animation-delay:' + (-1 + i / 12).toFixed(3) + 's"></span>';
-      el.innerHTML = h;
+      var h = '<svg viewBox="0 0 24 24">';
+      for (var i = 0; i < 8; i++) {
+        h += '<line x1="12" y1="2.8" x2="12" y2="7" opacity="' + (1 - i * 0.11).toFixed(2) + '" transform="rotate(' + (-i * 45) + ' 12 12)"/>';
+      }
+      el.innerHTML = h + '</svg>';
     }
     crearSpinner($('esperaSpinner'));
-    function mostrarEspera(texto) { $('esperaTexto').textContent = texto; $('espera').classList.add('visible'); }
-    function ocultarEspera() { $('espera').classList.remove('visible'); }
+    var _espera = { timer: null, desde: 0 };
+    function mostrarEspera(texto) {
+      $('esperaTexto').textContent = texto;
+      clearTimeout(_espera.timer);
+      _espera.timer = setTimeout(function () { _espera.desde = Date.now(); $('espera').classList.add('visible'); }, 250);
+    }
+    function ocultarEspera() {
+      clearTimeout(_espera.timer);
+      if (!$('espera').classList.contains('visible')) return Promise.resolve();
+      var falta = Math.max(0, 500 - (Date.now() - _espera.desde));
+      return new Promise(function (r) { setTimeout(function () { $('espera').classList.remove('visible'); r(); }, falta); });
+    }
 
     // ================================================================ Servidor
     async function llamar(accion, datos) {
@@ -769,18 +959,26 @@ var Rostro = (function () {
     })();
     var lineasAnillo = Array.prototype.slice.call($('anillo').querySelectorAll('line'));
 
+    var _escEstado = null, _escMarcas = -1;
     var Escaner = {
-      estado: function (nombre) { $('escaner').className = 'escaner ' + (nombre || ''); },
+      estado: function (nombre) {
+        var c = 'escaner ' + (nombre || '');
+        if (c !== _escEstado) { _escEstado = c; $('escaner').className = c; }
+      },
       progreso: function (p) {
         var n = Math.round(Math.max(0, Math.min(1, p)) * MARCAS);
-        lineasAnillo.forEach(function (l, i) { l.classList.toggle('on', i < n); });
+        if (n === _escMarcas) return;
+        // Avanza como máximo unas marcas por cuadro: el anillo se llena suave aunque el progreso salte.
+        var desde = _escMarcas < 0 ? 0 : _escMarcas;
+        lineasAnillo.forEach(function (l, i) { if ((i < n) !== (i < desde)) l.classList.toggle('on', i < n); });
+        _escMarcas = n;
       },
       guia: function (texto, detalle, glifo) {
         if ($('guiaTexto').textContent !== texto) {
           $('guiaTexto').textContent = texto;
           $('guia').classList.remove('cambio'); void $('guia').offsetWidth; $('guia').classList.add('cambio');
         }
-        $('guiaDetalle').textContent = detalle || '';
+        if ($('guiaDetalle').textContent !== (detalle || '')) $('guiaDetalle').textContent = detalle || '';
         var g = glifo || '';
         if ($('glifo').getAttribute('data-g') !== g) {
           $('glifo').setAttribute('data-g', g);
@@ -800,6 +998,7 @@ var Rostro = (function () {
     };
 
     // ================================================================ Estado general
+    var VERSION_KIOSCO = '4.0';
     var CLAVE_TOKEN = 'asistencia_kiosco_token';
     var estado = { token: null, tienda: null, desfaseMs: 0, ticket: null, persona: null, acciones: [], registro: null, gps: null, timer: null, intento: 0, consentimiento: false };
 
@@ -874,6 +1073,7 @@ var Rostro = (function () {
         return;
       }
       estado.token = leerToken();
+      $('version').textContent = 'Versión ' + VERSION_KIOSCO;
       try {
         var r = await llamar('estado', { token: estado.token || '' });
         estado.desfaseMs = r.datos.ahora - Date.now();
@@ -892,6 +1092,21 @@ var Rostro = (function () {
     }
     function ponerTienda(t) { estado.tienda = t; $('nomTienda').textContent = t.nombre; }
 
+    /**
+     * El kiosco puede quedar abierto días: cada 15 min, si nadie lo está usando, revisa si se publicó
+     * una versión nueva y se recarga solo.
+     */
+    var _ultimoUso = Date.now();
+    document.addEventListener('pointerdown', function () { _ultimoUso = Date.now(); }, true);
+    setInterval(async function () {
+      if (!$('sInicio').classList.contains('visible') || Date.now() - _ultimoUso < 60000) return;
+      try {
+        var html = await (await fetch(location.href.split('#')[0], { cache: 'no-store' })).text();
+        var m = html.match(/VERSION_KIOSCO = '([^']+)'/);
+        if (m && m[1] !== VERSION_KIOSCO) location.reload();
+      } catch (e) { /* sin internet: se revisa más tarde */ }
+    }, 15 * 60 * 1000);
+
     // ================================================================ Activación del equipo
     async function activar(codigo) {
       mostrarEspera('Verificando ubicación');
@@ -902,12 +1117,12 @@ var Rostro = (function () {
         guardarToken(r.datos.token);
         estado.token = r.datos.token;
         ponerTienda(r.datos.tienda);
-        ocultarEspera();
+        await ocultarEspera();
         vibrar([15, 40, 15]);
         aviso('Equipo activado para ' + r.datos.tienda.nombre, 'ok');
         reiniciar();
       } catch (e) {
-        ocultarEspera();
+        await ocultarEspera();
         tecladoActivar.error();
         aviso(e.mensaje || 'No se pudo activar', 'error');
       }
@@ -918,7 +1133,7 @@ var Rostro = (function () {
       mostrarEspera('Verificando');
       try {
         var r = await llamar('identificar', { token: estado.token, codigo: codigo });
-        ocultarEspera();
+        await ocultarEspera();
         estado.ticket = r.datos.ticket;
         estado.persona = r.datos;
         var acciones = r.datos.acciones;
@@ -938,7 +1153,7 @@ var Rostro = (function () {
         mostrar('sAcciones');
         programarRegreso(30000);
       } catch (e) {
-        ocultarEspera();
+        await ocultarEspera();
         if (e.resultado === 'CODIGO_INVALIDO') {
           tecladoCodigo.error();
           $('indicacion').textContent = 'Código incorrecto';
@@ -962,7 +1177,7 @@ var Rostro = (function () {
       $('camTitulo').textContent = titulo;
       $('congelada').removeAttribute('src');
       Escaner.estado('buscando'); Escaner.progreso(0); Escaner.pasos(1, 3);
-      Escaner.guia('Preparando cámara', 'Un momento', 'cargando');
+      Escaner.guia('Preparando cámara', Rostro.listo() ? 'Un momento' : 'Preparando el reconocimiento facial', 'cargando');
       mostrar('sCamara');
       programarRegreso(120000); // nadie se queda atorado en la cámara
       try {
@@ -1044,7 +1259,7 @@ var Rostro = (function () {
       mostrarEspera('Verificando código');
       try {
         var r = await llamar('validarRegistro', { token: estado.token, codigo: codigo });
-        ocultarEspera();
+        await ocultarEspera();
         estado.registro = r.datos;
         estado.consentimiento = false;
         $('regAcepto').className = 'interruptor';
@@ -1054,7 +1269,7 @@ var Rostro = (function () {
         mostrar('sRegConsentimiento');
         programarRegreso(180000);
       } catch (e) {
-        ocultarEspera();
+        await ocultarEspera();
         tecladoRegistro.error();
         aviso(e.mensaje || 'Código incorrecto', 'error');
       }
